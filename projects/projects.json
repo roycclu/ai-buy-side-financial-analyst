@@ -1,0 +1,35 @@
+{
+  "projects": [
+    {
+      "name": "AI_Capex_2025",
+      "companies": [
+        {
+          "name": "Microsoft Corporation",
+          "ticker": "MSFT"
+        },
+        {
+          "name": "Alphabet Inc.",
+          "ticker": "GOOG"
+        },
+        {
+          "name": "NVIDIA Corporation",
+          "ticker": "NVDA"
+        },
+        {
+          "name": "Inc.",
+          "ticker": "META"
+        },
+        {
+          "name": "Inc.",
+          "ticker": "AMD"
+        },
+        {
+          "name": "Apple Inc.",
+          "ticker": "AAPL"
+        }
+      ],
+      "question": "how did the capex of these companies changese over the years from 2021 to 2026, and compare the speed of revenue growth to capex growth, and compare the capax growth to stock performance",
+      "created": "2026-02-22T02:52:02.406805"
+    }
+  ]
+}
