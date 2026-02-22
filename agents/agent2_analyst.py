@@ -2,18 +2,13 @@
 
 import sys
 
-import anthropic
-
-from config import MODEL, MAX_TOKENS, MAX_AGENT_TURNS, FINANCIAL_FILES_DIR, FINANCIAL_DATA_DIR
+from config import MAX_AGENT_TURNS, FINANCIAL_FILES_DIR, FINANCIAL_DATA_DIR
+from llm import create_adapter
 from tools import AGENT2_TOOL_DEFINITIONS, AGENT2_FUNCTIONS, execute_tool
 from utils.prompts import AGENT2_SYSTEM_PROMPT, build_agent2_message
 
 # Trim history when total content exceeds this (leaves headroom for system prompt + thinking)
 _MAX_HISTORY_CHARS = 400_000  # ~100k tokens
-
-
-def _extract_text(content_blocks) -> str:
-    return "\n".join(b.text for b in content_blocks if hasattr(b, "text"))
 
 
 def _estimate_chars(messages: list) -> int:
@@ -36,38 +31,48 @@ def _estimate_chars(messages: list) -> int:
 
 
 def _trim_tool_results(messages: list) -> list:
-    """Replace old tool_result content with a placeholder to stay within the context limit.
+    """Replace old tool-result content with a placeholder to stay within context limit.
 
-    The two most-recent messages (the last assistant turn + its tool results) are always
-    kept intact so the model retains full context for the current step.
+    Handles both message formats:
+    - Anthropic: role=user, content=[{type: tool_result, ...}]
+    - Ollama:    role=tool, content=<str>
+
+    The two most-recent messages are always kept intact.
     """
     if _estimate_chars(messages) <= _MAX_HISTORY_CHARS:
         return messages
 
+    PLACEHOLDER = "[content truncated from history to stay within context limit — already processed]"
     trimmed = []
     for i, msg in enumerate(messages):
         is_recent = i >= len(messages) - 2
-        if (
-            not is_recent
-            and msg.get("role") == "user"
-            and isinstance(msg.get("content"), list)
-        ):
+        if is_recent:
+            trimmed.append(msg)
+            continue
+
+        role = msg.get("role")
+        content = msg.get("content")
+
+        # Anthropic format: role=user with a list of tool_result blocks
+        if role == "user" and isinstance(content, list):
             new_blocks = []
-            for block in msg["content"]:
+            for block in content:
                 if isinstance(block, dict) and block.get("type") == "tool_result":
-                    content = block.get("content", "")
-                    if len(str(content)) > 300:
-                        new_blocks.append({
-                            **block,
-                            "content": "[content truncated from history to stay within context limit — already processed]",
-                        })
+                    if len(str(block.get("content", ""))) > 300:
+                        new_blocks.append({**block, "content": PLACEHOLDER})
                     else:
                         new_blocks.append(block)
                 else:
                     new_blocks.append(block)
             trimmed.append({**msg, "content": new_blocks})
+
+        # Ollama format: role=tool with a plain string content
+        elif role == "tool" and isinstance(content, str) and len(content) > 300:
+            trimmed.append({**msg, "content": PLACEHOLDER})
+
         else:
             trimmed.append(msg)
+
     return trimmed
 
 
@@ -80,7 +85,7 @@ class AnalystAgent:
 
     def __init__(self, companies: list[dict]):
         self.companies = companies
-        self.client = anthropic.Anthropic()
+        self.adapter = create_adapter(thinking=True, thinking_budget=5000)
 
     def run(self) -> str:
         """Execute the analyst agent loop and return the final summary."""
@@ -93,43 +98,28 @@ class AnalystAgent:
         messages = [{"role": "user", "content": user_message}]
 
         for turn in range(MAX_AGENT_TURNS):
-            print(f"  [Turn {turn + 1}] Calling Claude...", file=sys.stderr)
+            print(f"  [Turn {turn + 1}] Calling LLM...", file=sys.stderr)
             messages = _trim_tool_results(messages)
 
-            response = self.client.beta.messages.create(
-                model=MODEL,
-                max_tokens=MAX_TOKENS,
-                thinking={"type": "enabled", "budget_tokens": 5000},
-                system=AGENT2_SYSTEM_PROMPT,
-                tools=AGENT2_TOOL_DEFINITIONS,
-                messages=messages,
-                betas=["interleaved-thinking-2025-05-14"],
-            )
+            response = self.adapter.chat(messages, AGENT2_SYSTEM_PROMPT, AGENT2_TOOL_DEFINITIONS)
 
             print(f"  Stop reason: {response.stop_reason}", file=sys.stderr)
 
             if response.stop_reason == "tool_use":
-                tool_results = []
-                for block in response.content:
-                    if block.type == "tool_use":
-                        print(f"  Tool: {block.name}({block.input})", file=sys.stderr)
-                        result = execute_tool(block.name, block.input, AGENT2_FUNCTIONS)
-                        tool_results.append({
-                            "type": "tool_result",
-                            "tool_use_id": block.id,
-                            "content": result,
-                        })
-                messages.append({"role": "assistant", "content": response.content})
-                messages.append({"role": "user", "content": tool_results})
+                results = []
+                for tc in response.tool_calls:
+                    print(f"  Tool: {tc.name}({tc.input})", file=sys.stderr)
+                    results.append(execute_tool(tc.name, tc.input, AGENT2_FUNCTIONS))
+                messages.append(self.adapter.make_assistant_message(response))
+                messages.extend(self.adapter.make_tool_results_messages(response.tool_calls, results))
 
             elif response.stop_reason == "end_turn":
-                summary = _extract_text(response.content)
-                print(f"[Agent 2] Done. ({len(summary)} chars)", file=sys.stderr)
-                return summary
+                print(f"[Agent 2] Done. ({len(response.text)} chars)", file=sys.stderr)
+                return response.text
 
             else:
                 print(f"  Unexpected stop reason: {response.stop_reason}", file=sys.stderr)
-                return _extract_text(response.content)
+                return response.text
 
         print(f"[Agent 2] Warning: reached max turns ({MAX_AGENT_TURNS})", file=sys.stderr)
-        return _extract_text(response.content) if response else ""
+        return response.text if response else ""

@@ -2,15 +2,10 @@
 
 import sys
 
-import anthropic
-
-from config import MODEL, MAX_TOKENS, MAX_AGENT_TURNS, FINANCIAL_DATA_DIR, FINANCIAL_ANALYSES_DIR
+from config import MAX_AGENT_TURNS, FINANCIAL_DATA_DIR, FINANCIAL_ANALYSES_DIR
+from llm import create_adapter
 from tools import get_agent4_tool_definitions, get_agent4_functions, execute_tool
 from utils.prompts import AGENT4_SYSTEM_PROMPT, build_agent4_message
-
-
-def _extract_text(content_blocks) -> str:
-    return "\n".join(b.text for b in content_blocks if hasattr(b, "text"))
 
 
 class VisualizationAgent:
@@ -24,7 +19,7 @@ class VisualizationAgent:
     def __init__(self, project: str, viz_specs: list[dict]):
         self.project = project
         self.viz_specs = viz_specs
-        self.client = anthropic.Anthropic()
+        self.adapter = create_adapter(thinking=False)
 
     def run(self) -> str:
         """Execute the visualization agent loop and return a summary."""
@@ -48,40 +43,27 @@ class VisualizationAgent:
         tool_functions = get_agent4_functions()
 
         for turn in range(MAX_AGENT_TURNS):
-            print(f"  [Turn {turn + 1}] Calling Claude...", file=sys.stderr)
+            print(f"  [Turn {turn + 1}] Calling LLM...", file=sys.stderr)
 
-            response = self.client.messages.create(
-                model=MODEL,
-                max_tokens=MAX_TOKENS,
-                system=AGENT4_SYSTEM_PROMPT,
-                tools=tool_definitions,
-                messages=messages,
-            )
+            response = self.adapter.chat(messages, AGENT4_SYSTEM_PROMPT, tool_definitions)
 
             print(f"  Stop reason: {response.stop_reason}", file=sys.stderr)
 
             if response.stop_reason == "tool_use":
-                tool_results = []
-                for block in response.content:
-                    if block.type == "tool_use":
-                        print(f"  Tool: {block.name}({block.input})", file=sys.stderr)
-                        result = execute_tool(block.name, block.input, tool_functions)
-                        tool_results.append({
-                            "type": "tool_result",
-                            "tool_use_id": block.id,
-                            "content": result,
-                        })
-                messages.append({"role": "assistant", "content": response.content})
-                messages.append({"role": "user", "content": tool_results})
+                results = []
+                for tc in response.tool_calls:
+                    print(f"  Tool: {tc.name}({tc.input})", file=sys.stderr)
+                    results.append(execute_tool(tc.name, tc.input, tool_functions))
+                messages.append(self.adapter.make_assistant_message(response))
+                messages.extend(self.adapter.make_tool_results_messages(response.tool_calls, results))
 
             elif response.stop_reason == "end_turn":
-                summary = _extract_text(response.content)
-                print(f"[Agent 4] Done. ({len(summary)} chars)", file=sys.stderr)
-                return summary
+                print(f"[Agent 4] Done. ({len(response.text)} chars)", file=sys.stderr)
+                return response.text
 
             else:
                 print(f"  Unexpected stop reason: {response.stop_reason}", file=sys.stderr)
-                return _extract_text(response.content)
+                return response.text
 
         print(f"[Agent 4] Warning: reached max turns ({MAX_AGENT_TURNS})", file=sys.stderr)
-        return _extract_text(response.content) if response else ""
+        return response.text if response else ""

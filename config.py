@@ -22,6 +22,11 @@ MODEL = "claude-opus-4-6"
 MAX_TOKENS = 8192
 MAX_AGENT_TURNS = 25
 
+# LLM provider — "anthropic" (default) or "ollama"
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "anthropic")
+LOCAL_MODEL = os.getenv("LOCAL_MODEL", "llama3.1:8b")
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+
 # SEC EDGAR API settings
 SEC_EDGAR_SUBMISSIONS_URL = "https://data.sec.gov/submissions"
 SEC_EDGAR_ARCHIVES_URL = "https://www.sec.gov/Archives/edgar/data"

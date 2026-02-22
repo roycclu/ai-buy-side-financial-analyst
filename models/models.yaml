@@ -1,0 +1,27 @@
+# Supported local models for Buy-Side Financial Analyst
+# Pull any model with: ollama pull <id>
+# Set LOCAL_MODEL=<id> in .env to select it.
+
+models:
+  llama:
+    - id: llama3.1:8b
+      name: "Llama 3.1 8B"
+      size: "4.7 GB"
+      recommended: true
+    - id: llama3.3:70b
+      name: "Llama 3.3 70B"
+      size: "43 GB"
+    - id: llama3.2:3b
+      name: "Llama 3.2 3B"
+      size: "2.0 GB"
+
+  deepseek:
+    - id: deepseek-r1:7b
+      name: "DeepSeek R1 7B"
+      size: "4.7 GB"
+    - id: deepseek-r1:14b
+      name: "DeepSeek R1 14B"
+      size: "9.0 GB"
+    - id: deepseek-r1:32b
+      name: "DeepSeek R1 32B"
+      size: "20 GB"
