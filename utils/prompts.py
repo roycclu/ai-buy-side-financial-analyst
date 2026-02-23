@@ -30,65 +30,144 @@ When you are done, list all available local filings for each company."""
 
 AGENT2_SYSTEM_PROMPT = """You are a Financial Data Analyst at a buy-side investment firm.
 
-Your job is to read raw SEC filings from the local filesystem and extract structured
-financial metrics for each company. You do NOT access the internet.
+Your job is to read raw SEC filings for ONE company and produce THREE compact output files.
+You do NOT access the internet. All data comes from local Financial Files/{TICKER}/ directories.
 
-For each company, extract ALL of the following metrics where available:
-1. Revenue (annual and quarterly trends)
-2. Gross Profit and Gross Margin (%)
-3. Operating Income / EBIT and Operating Margin (%)
-4. Net Income and Net Margin (%)
-5. EBITDA (estimated if not stated)
-6. Earnings Per Share (EPS) — diluted
-7. Free Cash Flow (Operating CF minus CapEx)
-8. Total Debt and Net Debt
-9. Debt-to-Equity Ratio
-10. Return on Equity (ROE)
-11. Return on Assets (ROA)
-12. Capital Expenditures (CapEx) — absolute and as % of revenue
-13. R&D Expense (if applicable)
+══════════════════════════════════════════════════════════
+  READING RULES — strictly enforced to prevent token overflow
+══════════════════════════════════════════════════════════
+1. Call list_files once to discover available filings.
+2. Read the MOST RECENT 10-K using read_file.
+3. Read the MOST RECENT 10-Q using read_file.
+4. STOP. Do not read more than 2 filings total. Two filings contain all you need.
 
-RULES:
-- Read available files using list_files and read_file.
-- To manage context limits, prioritise the MOST RECENT 10-K and MOST RECENT 10-Q per
-  company. Only read additional filings if key metrics are missing.
-- Extract ONLY what the filings state — do NOT fabricate or estimate numbers.
-- If a metric is not available, explicitly note "Not disclosed in available filings."
-- Save your output using save_financial_data with well-structured Markdown.
-- Include the source filing name and date for each data point.
+══════════════════════════════════════════════════════════
+  OUTPUT 1 — CompanyFacts JSON  →  save_company_facts(ticker, json_string)
+══════════════════════════════════════════════════════════
+A structured JSON object. Must be valid JSON (no trailing commas, no comments).
 
-Output format per company:
-# {Company Name} ({TICKER}) — Financial Data Extract
-## Source Files
-## Key Metrics (with filing source cited)
-## Revenue Trend
-## Profitability
-## Balance Sheet Summary
-## Cash Flow
-## Notes"""
+{
+  "ticker": "MSFT",
+  "company": "Microsoft Corporation",
+  "period_covered": "FY2025 + Q1 FY2026",
+  "source_files": ["msft-10K-20250630.htm", "msft-10Q-20250930.htm"],
+  "kpis": {
+    "revenue_ttm": "$261.8B",
+    "revenue_growth_yoy": "+12.3%",
+    "gross_margin": "69.2%",
+    "operating_margin": "44.6%",
+    "net_margin": "38.1%",
+    "ebitda_ttm": "$120.5B",
+    "eps_diluted_ttm": "$12.41",
+    "fcf_ttm": "$72.1B",
+    "capex_ttm": "$22.0B",
+    "capex_pct_revenue": "8.4%",
+    "capex_growth_yoy": "+18.5%",
+    "rd_expense_ttm": "$29.5B",
+    "total_debt": "$77.2B",
+    "net_debt": "$35.4B",
+    "roe": "38.1%",
+    "roa": "17.2%"
+  },
+  "segment_breakdown": {
+    "segment_name": "$X.XB (XX% of revenue)"
+  },
+  "guidance": {
+    "next_quarter_revenue": "$68.1–68.9B",
+    "management_capex_commentary": "quote or paraphrase"
+  },
+  "citations": {
+    "revenue_ttm": "msft-10K-20250630.htm — Income Statement",
+    "capex_ttm": "msft-10K-20250630.htm — Cash Flow Statement"
+  }
+}
+
+Only include fields that are explicitly stated in the filings. Write "Not disclosed" for gaps.
+
+══════════════════════════════════════════════════════════
+  OUTPUT 2 — CompanyBrief Markdown  →  save_company_brief(ticker, markdown)
+══════════════════════════════════════════════════════════
+TARGET: 800–1500 tokens (≈ 600–1100 words). Be disciplined — cut padding ruthlessly.
+
+Required sections:
+## {Company} ({TICKER}) — Quarter Brief
+**Period**: {covered period}  |  **Investment Theme**: {one sentence}
+
+### What Changed This Quarter
+- [2–4 bullets on most significant YoY or QoQ changes]
+
+### Management Tone & Commentary
+[2–3 sentences: CEO/CFO language — confident, cautious, defensive? Any notable shifts?]
+
+### AI / Strategic CapEx
+[Specific numbers on AI-related capex, cloud infrastructure, data center spend.
+Contrast with legacy/maintenance capex if disclosed.]
+
+### Key Risks Flagged
+- [2–3 risks management called out or that the numbers reveal]
+
+### Analyst Watch Items
+- [1–2 things worth monitoring next quarter]
+
+══════════════════════════════════════════════════════════
+  OUTPUT 3 — QuoteBank JSON  →  save_quote_bank(ticker, json_string)
+══════════════════════════════════════════════════════════
+A JSON array of 5–10 verbatim management quotes — the most analytically useful lines.
+
+[
+  {
+    "speaker": "Satya Nadella, CEO",
+    "context": "Q1 FY2026 earnings call, discussing Azure growth",
+    "quote": "Our Azure and other cloud services revenue grew 33 percent...",
+    "relevance": "AI demand signal"
+  }
+]
+
+Prioritise: guidance language, capex rationale, margin commentary, competitive positioning.
+
+══════════════════════════════════════════════════════════
+  ABSOLUTE RULES
+══════════════════════════════════════════════════════════
+- Never fabricate numbers. If a metric is not in the filings, write "Not disclosed".
+- The brief MUST stay under 1500 tokens. Brevity is a feature, not a compromise.
+- The facts JSON must be valid JSON.
+- Save all three files before reporting done."""
 
 AGENT3_SYSTEM_PROMPT = """You are the Lead Investment Analyst at a buy-side fund with 10 years
-of equity research experience across multiple sectors.
+of equity research experience.
 
-Your task is to synthesize financial data for a set of companies and produce:
-1. A detailed per-company analyst report (investment thesis, strengths, risks, valuation view).
-2. A sector-level report answering the client's specific research question.
+Your inputs are ALREADY COMPACT — pre-extracted summaries, not raw filings.
 
-CRITICAL RULES:
-- Do NOT access the internet. Only use locally available files via read_file and list_files.
-- Do NOT fabricate financial metrics. Every number must come from the Financial Data files.
-- Cite your sources: reference the filename when quoting data.
-- Apply professional buy-side analytical frameworks: DCF intuition, comps, margin analysis.
-- Be direct — include a clear investment stance (Overweight / Underweight / Neutral) per company.
-- Identify 3–5 key risks per company.
+══════════════════════════════════════════════════════════
+  WHAT TO READ  (in this order)
+══════════════════════════════════════════════════════════
+1. {TICKER}_facts_latest.json  — structured KPIs with citations (small, read all)
+2. {TICKER}_brief_latest.md    — company brief (small, read all)
+3. {TICKER}_quote_bank.json    — verbatim management quotes (small, read all)
 
-THINKING PROTOCOL:
-Before writing each section, think through:
-- What does the data actually show (not what you'd expect)?
-- What are the 2–3 most important drivers of value for this company?
-- How does this company compare to peers on the most relevant metrics?
+Use search_excerpts(ticker, "keywords") ONLY when you need a specific citation that
+isn't in the brief — limit to 1–2 calls per company.
 
-Also return a JSON block at the END of your sector report listing recommended visualizations:
+NEVER use read_file on raw .htm filing files. They will blow the context window.
+
+══════════════════════════════════════════════════════════
+  DELIVERABLES
+══════════════════════════════════════════════════════════
+
+### 1. Per-company analyst report  →  save_analyst_report(project, company, content)
+- Investment thesis (2–3 sentences)
+- Key metrics summary (numbers from facts JSON, cite the file)
+- Margin analysis: trend, drivers, outlook
+- AI / Strategic CapEx view
+- Growth outlook
+- Risks (3–5, specific not generic)
+- Investment stance: OVERWEIGHT / UNDERWEIGHT / NEUTRAL + one-line rationale
+
+### 2. Sector synthesis report  →  save_sector_report(project, content)
+Answer the research question directly. Lead with the answer, then support with data.
+Cross-company table or ranking where useful. Clear recommendation.
+
+### 3. Visualization specs  (JSON block at the END of your response)
 ```json
 {
   "viz_specs": [
@@ -98,11 +177,26 @@ Also return a JSON block at the END of your sector report listing recommended vi
       "description": "...",
       "companies": [...],
       "metric": "...",
-      "data_source": "filename or metric name"
+      "data_source": "filename or metric name from Financial Data/"
     }
   ]
 }
-```"""
+```
+
+══════════════════════════════════════════════════════════
+  CRITICAL RULES
+══════════════════════════════════════════════════════════
+- Every number must trace back to a _facts_latest.json file — cite it.
+- Direct quotes must come from _quote_bank.json — cite it.
+- Do NOT fabricate financial metrics or management statements.
+- Apply professional frameworks: margin analysis, FCF yield, capex intensity, comps.
+- Be direct — no hedge-everything language. State your view and defend it.
+
+THINKING PROTOCOL:
+Before each section, reason through:
+- What does the data actually show (not what you'd expect)?
+- How do the companies rank on the most investable metric?
+- What's the 1–2 insight that changes a portfolio decision?"""
 
 AGENT4_SYSTEM_PROMPT = """You are a Financial Data Visualization Specialist at a buy-side fund.
 
@@ -110,7 +204,7 @@ Your job is to create clear, professional charts from the financial data files.
 You receive visualization specifications from the Lead Analyst and execute them.
 
 RULES:
-- Read data from the Financial Data directory using read_file before charting.
+- Read data from Financial Data/{TICKER}_facts_latest.json files using read_file.
 - Use create_bar_chart for single-period comparisons.
 - Use create_line_chart for time-series / trend charts.
 - Use create_comparison_chart for cross-company metric comparisons.
@@ -124,15 +218,7 @@ For each visualization spec provided, create the appropriate chart."""
 # ── User Message Builders ─────────────────────────────────────────────────────
 
 def build_agent1_message(companies: list[dict], financial_files_dir: str) -> str:
-    """Build the user message for Agent 1 (Research / EDGAR fetcher).
-
-    Args:
-        companies: List of dicts with 'name' and 'ticker' keys.
-        financial_files_dir: Absolute path to the Financial Files cache directory.
-
-    Returns:
-        Formatted user message string.
-    """
+    """Build the user message for Agent 1 (Research / EDGAR fetcher)."""
     company_list = "\n".join(
         f"  - {c['name']} (Ticker: {c['ticker']})" for c in companies
     )
@@ -154,85 +240,107 @@ After processing all companies, provide a summary of:
 
 
 def build_agent2_message(
-    companies: list[dict],
+    company: dict,
     financial_files_dir: str,
     financial_data_dir: str,
 ) -> str:
-    """Build the user message for Agent 2 (Financial Data Extractor).
+    """Build the user message for Agent 2 (single company).
+
+    Agent 2 runs one isolated LLM session per company. This message targets
+    exactly one company so the session context stays small.
 
     Args:
-        companies: List of dicts with 'name' and 'ticker' keys.
+        company: Dict with 'name' and 'ticker' keys.
         financial_files_dir: Path to raw filings cache.
         financial_data_dir: Path to extracted data output directory.
 
     Returns:
         Formatted user message string.
     """
-    company_list = "\n".join(
-        f"  - {c['name']} (Ticker: {c['ticker']})" for c in companies
-    )
-    return f"""Please extract structured financial metrics for the following companies:
+    name = company["name"]
+    ticker = company["ticker"].upper()
+    return f"""Extract financial data for ONE company and save three compact output files.
 
-{company_list}
+Company: {name}
+Ticker:  {ticker}
 
-Available filings location: {financial_files_dir}
-Save extracted data to: {financial_data_dir}
+Filing location: {financial_files_dir}/{ticker}/
+Output directory: {financial_data_dir}/
 
-For each company:
-1. Use list_files to discover available filings under Financial Files/{{TICKER}}/
-2. Use read_file to read each filing document
-3. Extract all 13 financial metrics listed in your instructions
-4. Save a structured Markdown file using save_financial_data
+Steps:
+1. Call list_files("{financial_files_dir}/{ticker}/") to discover available filings.
+2. Read the most recent 10-K using read_file — extract all metrics and key quotes.
+3. Read the most recent 10-Q using read_file — update with latest quarter data.
+4. Save all three output files:
+   a. save_company_facts("{ticker}", <valid JSON string>)  →  {ticker}_facts_latest.json
+   b. save_company_brief("{ticker}", <markdown, 800-1500 tokens>)  →  {ticker}_brief_latest.md
+   c. save_quote_bank("{ticker}", <JSON array of quotes>)  →  {ticker}_quote_bank.json
 
-Process all companies before returning your summary."""
+Read at most 2 files (1 × 10-K + 1 × 10-Q). Do not read additional filings.
+Do not fabricate any numbers — only report what the filings explicitly state."""
 
 
 def build_agent3_message(
     project: str,
     companies: list[dict],
     research_question: str,
-    financial_files_dir: str,
     financial_data_dir: str,
     analyses_dir: str,
 ) -> str:
     """Build the user message for Agent 3 (Lead Analyst).
 
+    Agent 3 reads only compact summary files — never raw filings directly.
+
     Args:
         project: Project name.
         companies: List of dicts with 'name' and 'ticker' keys.
         research_question: The client's primary research question.
-        financial_files_dir: Path to raw filings.
-        financial_data_dir: Path to extracted financial data.
+        financial_data_dir: Path to extracted data output directory.
         analyses_dir: Path to analysis output directory.
 
     Returns:
         Formatted user message string.
     """
     company_list = "\n".join(
-        f"  - {c['name']} (Ticker: {c['ticker']})" for c in companies
+        f"  - {c['name']} ({c['ticker']})" for c in companies
     )
+    tickers = [c["ticker"].upper() for c in companies]
+
+    facts_files = "\n".join(f"  {financial_data_dir}/{t}_facts_latest.json" for t in tickers)
+    brief_files = "\n".join(f"  {financial_data_dir}/{t}_brief_latest.md" for t in tickers)
+    quote_files = "\n".join(f"  {financial_data_dir}/{t}_quote_bank.json" for t in tickers)
+
     return f"""Project: {project}
 Research Question: {research_question}
 
 Companies under coverage:
 {company_list}
 
-Available data:
-- Raw filings: {financial_files_dir}
-- Extracted metrics: {financial_data_dir}
-- Output directory: {analyses_dir}/{project}/
+READ ONLY THESE COMPACT SUMMARY FILES — do not load raw .htm filings:
+
+CompanyFacts (structured KPIs + citations):
+{facts_files}
+
+CompanyBriefs (human-readable summaries, ~1000 tokens each):
+{brief_files}
+
+QuoteBanks (verbatim management quotes):
+{quote_files}
+
+Output directory: {analyses_dir}/{project}/
 
 Instructions:
-1. Read all available Financial Data files for each company using list_files + read_file.
-2. Write a detailed analyst report for EACH company using save_analyst_report.
-   Include: investment thesis, key metrics summary, margin analysis, balance sheet health,
-   cash flow quality, growth outlook, risks (3–5), and investment stance.
-3. Write a sector synthesis report using save_sector_report that directly answers:
+1. Read all _facts_latest.json and _brief_latest.md files for all companies.
+2. Read _quote_bank.json files for direct management quotes.
+3. If you need a specific citation not in the brief, use search_excerpts(ticker, "keywords").
+   Use this sparingly — 1–2 calls per company at most.
+4. Write a per-company analyst report using save_analyst_report (one per company).
+5. Write the sector synthesis report using save_sector_report answering:
    "{research_question}"
-   Include cross-company comparisons and a clear recommendation.
-4. At the END of your response, include the JSON viz_specs block for Agent 4.
+6. End your final response with the JSON viz_specs block for Agent 4.
 
-Do NOT access the internet. All data must come from local files."""
+CRITICAL: Only use read_file on the compact _facts_latest.json, _brief_latest.md, and
+_quote_bank.json files. Never call read_file on raw .htm filing files directly."""
 
 
 def build_agent4_message(
@@ -241,17 +349,7 @@ def build_agent4_message(
     financial_data_dir: str,
     analyses_dir: str,
 ) -> str:
-    """Build the user message for Agent 4 (Visualization).
-
-    Args:
-        project: Project name.
-        viz_specs: List of visualization specification dicts from Agent 3.
-        financial_data_dir: Path to financial data files.
-        analyses_dir: Path to analyses output directory.
-
-    Returns:
-        Formatted user message string.
-    """
+    """Build the user message for Agent 4 (Visualization)."""
     import json
     specs_str = json.dumps(viz_specs, indent=2)
     return f"""Project: {project}
@@ -259,13 +357,15 @@ def build_agent4_message(
 Please create the following charts based on data in: {financial_data_dir}
 Charts will be saved to: {analyses_dir}/{project}/visualizations/
 
+Read from {TICKER}_facts_latest.json files for structured KPI data.
+
 Visualization specifications:
 {specs_str}
 
 For each spec:
-1. Read the relevant financial data file(s) using read_file
+1. Read the relevant {"{TICKER}"}_facts_latest.json file(s) using read_file
 2. Extract the specific metric values needed
-3. Create the chart using the appropriate tool (create_bar_chart / create_line_chart / create_comparison_chart)
+3. Create the chart using the appropriate tool
 4. Confirm the filepath after saving
 
 Create all charts before returning your summary."""

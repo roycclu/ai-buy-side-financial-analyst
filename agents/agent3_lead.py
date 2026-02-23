@@ -1,13 +1,19 @@
-"""Agent 3 — Lead Analyst: investment thesis + sector report with adaptive thinking."""
+"""Agent 3 — Lead Analyst: investment thesis + sector report with adaptive thinking.
+
+Agent 3 reads ONLY the compact summary files produced by Agent 2:
+  {TICKER}_facts_latest.json  — structured KPIs (small)
+  {TICKER}_brief_latest.md    — human-readable brief (small)
+  {TICKER}_quote_bank.json    — top management quotes (small)
+
+It never ingests raw filings wholesale. search_excerpts() is available for targeted
+retrieval when a specific citation is needed.
+"""
 
 import json
 import re
 import sys
 
-from config import (
-    MAX_AGENT_TURNS,
-    FINANCIAL_FILES_DIR, FINANCIAL_DATA_DIR, FINANCIAL_ANALYSES_DIR,
-)
+from config import MAX_AGENT_TURNS, FINANCIAL_DATA_DIR, FINANCIAL_ANALYSES_DIR
 from llm import create_adapter
 from tools import AGENT3_TOOL_DEFINITIONS, AGENT3_FUNCTIONS, execute_tool
 from utils.prompts import AGENT3_SYSTEM_PROMPT, build_agent3_message
@@ -37,6 +43,9 @@ def _parse_viz_specs(text: str) -> list[dict]:
 class AnalystLead:
     """Writes per-company analyst reports and a sector synthesis report.
 
+    Reads compact summary files (facts JSON + brief MD + quote bank) rather than
+    raw filings, so the session context stays small regardless of company count.
+
     Args:
         project: Project name.
         companies: List of dicts with 'name' and 'ticker' keys.
@@ -58,12 +67,12 @@ class AnalystLead:
         print("\n[Agent 3 — Lead Analyst] Writing investment analysis...", file=sys.stderr)
         print(f"  Project: {self.project}", file=sys.stderr)
         print(f"  Research question: {self.research_question}", file=sys.stderr)
+        print(f"  Reading compact summaries from: {FINANCIAL_DATA_DIR}", file=sys.stderr)
 
         user_message = build_agent3_message(
             self.project,
             self.companies,
             self.research_question,
-            FINANCIAL_FILES_DIR,
             FINANCIAL_DATA_DIR,
             FINANCIAL_ANALYSES_DIR,
         )
@@ -81,7 +90,7 @@ class AnalystLead:
             if response.stop_reason == "tool_use":
                 results = []
                 for tc in response.tool_calls:
-                    print(f"  Tool: {tc.name}({tc.input})", file=sys.stderr)
+                    print(f"  Tool: {tc.name}({list(tc.input.keys())})", file=sys.stderr)
                     results.append(execute_tool(tc.name, tc.input, AGENT3_FUNCTIONS))
                 messages.append(self.adapter.make_assistant_message(response))
                 messages.extend(self.adapter.make_tool_results_messages(response.tool_calls, results))

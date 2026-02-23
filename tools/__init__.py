@@ -19,15 +19,23 @@ from tools.file_tools import (
     save_financial_data,
     save_analyst_report,
     save_sector_report,
+    save_company_facts,
+    save_company_brief,
+    save_quote_bank,
+    search_excerpts,
     LIST_FILES_TOOL,
     READ_FILE_TOOL,
     SAVE_FILE_TOOL,
     SAVE_FINANCIAL_DATA_TOOL,
     SAVE_ANALYST_REPORT_TOOL,
     SAVE_SECTOR_REPORT_TOOL,
+    SAVE_COMPANY_FACTS_TOOL,
+    SAVE_COMPANY_BRIEF_TOOL,
+    SAVE_QUOTE_BANK_TOOL,
+    SEARCH_EXCERPTS_TOOL,
 )
 
-# ── Per-agent tool sets (Agents 1–3 have no matplotlib dependency) ────────────
+# ── Per-agent tool sets ───────────────────────────────────────────────────────
 
 AGENT1_TOOL_DEFINITIONS = [
     CHECK_CACHE_TOOL,
@@ -37,15 +45,20 @@ AGENT1_TOOL_DEFINITIONS = [
     LIST_FILES_TOOL,
 ]
 
+# Agent 2: reads at most 2 raw filings per company, writes 3 compact output files.
 AGENT2_TOOL_DEFINITIONS = [
     LIST_FILES_TOOL,
     READ_FILE_TOOL,
-    SAVE_FINANCIAL_DATA_TOOL,
+    SAVE_COMPANY_FACTS_TOOL,
+    SAVE_COMPANY_BRIEF_TOOL,
+    SAVE_QUOTE_BANK_TOOL,
 ]
 
+# Agent 3: reads only compact summary files; uses search_excerpts for targeted citations.
 AGENT3_TOOL_DEFINITIONS = [
-    READ_FILE_TOOL,
     LIST_FILES_TOOL,
+    READ_FILE_TOOL,
+    SEARCH_EXCERPTS_TOOL,
     SAVE_ANALYST_REPORT_TOOL,
     SAVE_SECTOR_REPORT_TOOL,
 ]
@@ -61,7 +74,7 @@ def get_agent4_tool_definitions() -> list:
     return [READ_FILE_TOOL, CREATE_BAR_CHART_TOOL, CREATE_LINE_CHART_TOOL, CREATE_COMPARISON_CHART_TOOL]
 
 
-# ── Function dispatch maps ───────────────────────────────────────────────────
+# ── Function dispatch maps ────────────────────────────────────────────────────
 
 AGENT1_FUNCTIONS = {
     "check_local_cache": check_local_cache,
@@ -74,12 +87,15 @@ AGENT1_FUNCTIONS = {
 AGENT2_FUNCTIONS = {
     "list_files": list_files,
     "read_file": read_file,
-    "save_financial_data": save_financial_data,
+    "save_company_facts": save_company_facts,
+    "save_company_brief": save_company_brief,
+    "save_quote_bank": save_quote_bank,
 }
 
 AGENT3_FUNCTIONS = {
-    "read_file": read_file,
     "list_files": list_files,
+    "read_file": read_file,
+    "search_excerpts": search_excerpts,
     "save_analyst_report": save_analyst_report,
     "save_sector_report": save_sector_report,
 }

@@ -9,8 +9,8 @@ Five coordinated AI agents mimic a real research function:
 
 1. **Agent 0 — Project Manager**: CLI interface for project setup and orchestration
 2. **Agent 1 — Research Agent**: Fetches SEC EDGAR filings (10-K, 10-Q) with cache-first logic
-3. **Agent 2 — Analyst Agent**: Extracts 13 financial metrics from raw filings
-4. **Agent 3 — Lead Analyst**: Writes per-company analyst reports and a sector synthesis
+3. **Agent 2 — Analyst Agent**: Extracts compact CompanyFacts + CompanyBrief + QuoteBank per company
+4. **Agent 3 — Lead Analyst**: Writes per-company analyst reports and a sector synthesis from compact summaries
 5. **Agent 4 — Visualization Agent**: Generates professional charts (bar, line, comparison)
 
 All outputs are cached. Arize Phoenix provides local observability at `http://localhost:6006`.
@@ -58,24 +58,21 @@ Companies: Microsoft Corporation:MSFT, Apple Inc:AAPL
 Research question: Which company has stronger AI capex growth?
 ```
 
-The system will then:
-- Check local filing cache for MSFT and AAPL
-- Download any missing 10-K / 10-Q filings from SEC EDGAR
-- Extract financial metrics from the filings
-- Write analyst reports + a sector report answering your question
-- Generate comparison charts
-
 ---
 
 ## Output Structure
 
 ```
 Financial Files/
-└── MSFT/10K/, MSFT/10Q/, AAPL/10K/, AAPL/10Q/   ← raw filings (cached)
+└── MSFT/10K/, MSFT/10Q/, AAPL/10K/, AAPL/10Q/    ← raw filings (cached, not read by Agent 3)
 
 Financial Data/
-└── Microsoft_Corporation_MSFT_2025-02-22.md        ← extracted metrics
-└── Apple_Inc_AAPL_2025-02-22.md
+├── MSFT_facts_latest.json    ← structured KPI table + citations
+├── MSFT_brief_latest.md      ← 800-1500 token company summary
+├── MSFT_quote_bank.json      ← top 5-10 management quotes
+├── AAPL_facts_latest.json
+├── AAPL_brief_latest.md
+└── AAPL_quote_bank.json
 
 Financial Analyses/AI_Capex_2025/
 ├── analyst_reports/
@@ -89,6 +86,45 @@ Financial Analyses/AI_Capex_2025/
 
 ---
 
+## Architecture: Token-Efficient Two-Layer Design
+
+### The Problem (Before)
+
+Agent 2 would read all raw SEC filings (up to 40k chars each) for all companies into a
+single LLM session. With 3+ companies × 2 filings each, sessions regularly hit the
+200k context limit before the agent finished writing output.
+
+Agent 3 then read those large markdown files for cross-company synthesis — compounding
+the token pressure.
+
+### The Solution (Now)
+
+**Agent 2 — One Company at a Time**
+
+Each company runs in its **own isolated LLM session** (~35k tokens max vs. 200k limit).
+The session reads at most 2 filings (1 × 10-K + 1 × 10-Q) and produces three compact files:
+
+| File | Purpose | Size |
+|------|---------|------|
+| `{TICKER}_facts_latest.json` | Structured KPIs + citations | ~2–5k tokens |
+| `{TICKER}_brief_latest.md` | What changed, management tone, AI capex, risks | 800–1500 tokens |
+| `{TICKER}_quote_bank.json` | Top 5–10 verbatim management quotes | ~1–2k tokens |
+
+**Agent 3 — Compact Inputs Only**
+
+Agent 3 reads **only** the compact summary files — never raw filings. Its full context
+for N companies is predictable and small:
+
+```
+N × (facts ~3k + brief ~1.2k + quotes ~1.5k) + system + output
+= 5 companies × 5.7k = ~28k tokens of inputs
+```
+
+When a specific citation is needed, `search_excerpts(ticker, "keywords")` retrieves
+only the matching paragraphs (~1–3k tokens), not the entire filing.
+
+---
+
 ## Observability
 
 Arize Phoenix runs locally and auto-instruments all Claude API calls:
@@ -97,14 +133,7 @@ Arize Phoenix runs locally and auto-instruments all Claude API calls:
 http://localhost:6006
 ```
 
-View per-agent traces, token usage, tool calls, and thinking budgets.
-
----
-
-## Architecture
-
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system design, data flow diagram,
-and caching strategy.
+View per-agent traces, token usage per company session, tool calls, and thinking budgets.
 
 ---
 
@@ -113,5 +142,14 @@ and caching strategy.
 - **Cache-first**: Agent 1 never re-downloads filings < 24 months old
 - **No fabrication**: All agents have explicit guardrails against hallucinated data
 - **No internet in analysis**: Agents 2–4 read only from local files
-- **Adaptive thinking**: Agents 2 and 3 use extended thinking for deeper analysis
+- **Isolated sessions**: Agent 2 runs one LLM session per company to prevent context overflow
+- **Compact intermediates**: Agent 3 reads only the pre-extracted summaries (facts + brief + quotes)
+- **Targeted retrieval**: `search_excerpts` provides citation support without full filing ingestion
+- **Adaptive thinking**: Agents 2 and 3 use extended thinking for deeper analytical reasoning
 - **Observability**: Every API call is traced via Arize Phoenix
+
+---
+
+## Architecture Details
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system design and data flow diagram.

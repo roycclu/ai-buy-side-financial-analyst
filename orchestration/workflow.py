@@ -14,8 +14,9 @@ class ResearchWorkflow:
 
     Pipeline:
         Agent 1 — collect raw filings (cache-first)
-        Agent 2 — extract financial metrics
-        Agent 3 — write analyst + sector reports → viz specs
+        Agent 2 — extract compact CompanyFacts + CompanyBrief + QuoteBank per company
+                  (one isolated LLM session per company to prevent context overflow)
+        Agent 3 — write analyst + sector reports from compact summaries → viz specs
         Agent 4 — generate charts
 
     Args:
@@ -37,7 +38,7 @@ class ResearchWorkflow:
         print("\n[Workflow] Phase 1/4 — Filing Collection", file=sys.stderr)
         agent1_summary = ResearchAgent(self.companies).run()
 
-        print("\n[Workflow] Phase 2/4 — Financial Data Extraction", file=sys.stderr)
+        print("\n[Workflow] Phase 2/4 — Compact Data Extraction (per-company sessions)", file=sys.stderr)
         agent2_summary = AnalystAgent(self.companies).run()
 
         print("\n[Workflow] Phase 3/4 — Investment Analysis", file=sys.stderr)

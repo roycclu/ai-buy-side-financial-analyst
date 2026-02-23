@@ -115,6 +115,139 @@ def save_file(filepath: str, content: str) -> dict:
         return {"success": False, "filepath": filepath, "error": str(exc)}
 
 
+# ── Compact-output savers (new architecture) ──────────────────────────────────
+
+def save_company_facts(ticker: str, content: str) -> dict:
+    """Save structured CompanyFacts JSON for a company.
+
+    Always writes to Financial Data/{TICKER}_facts_latest.json, overwriting any
+    previous version so Agent 3 always finds exactly one current file per ticker.
+
+    Args:
+        ticker: Stock ticker symbol (e.g. 'MSFT').
+        content: JSON string with structured KPIs and citations.
+
+    Returns:
+        Dict with 'success' and 'filepath'.
+    """
+    ticker_upper = ticker.upper().strip()
+    filepath = os.path.join(FINANCIAL_DATA_DIR, f"{ticker_upper}_facts_latest.json")
+    return save_file(filepath, content)
+
+
+def save_company_brief(ticker: str, content: str) -> dict:
+    """Save human-readable CompanyBrief markdown for a company.
+
+    Always writes to Financial Data/{TICKER}_brief_latest.md (target 800-1500 tokens).
+
+    Args:
+        ticker: Stock ticker symbol (e.g. 'MSFT').
+        content: Markdown-formatted company brief.
+
+    Returns:
+        Dict with 'success' and 'filepath'.
+    """
+    ticker_upper = ticker.upper().strip()
+    filepath = os.path.join(FINANCIAL_DATA_DIR, f"{ticker_upper}_brief_latest.md")
+    return save_file(filepath, content)
+
+
+def save_quote_bank(ticker: str, content: str) -> dict:
+    """Save the QuoteBank JSON (top 5-10 verbatim management quotes) for a company.
+
+    Always writes to Financial Data/{TICKER}_quote_bank.json.
+
+    Args:
+        ticker: Stock ticker symbol (e.g. 'MSFT').
+        content: JSON array of quote objects with 'quote', 'speaker', 'context' fields.
+
+    Returns:
+        Dict with 'success' and 'filepath'.
+    """
+    ticker_upper = ticker.upper().strip()
+    filepath = os.path.join(FINANCIAL_DATA_DIR, f"{ticker_upper}_quote_bank.json")
+    return save_file(filepath, content)
+
+
+def search_excerpts(ticker: str, keywords: str, max_chars: int = 8000) -> dict:
+    """Search raw filings for a ticker and return relevant text excerpts.
+
+    Finds paragraphs containing ALL the given keywords (case-insensitive).  Useful for
+    retrieving specific evidence or citations without loading an entire filing into context.
+
+    Args:
+        ticker: Stock ticker symbol (e.g. 'MSFT').
+        keywords: Space-separated keywords (all must appear in a paragraph to match).
+        max_chars: Maximum total characters to return across all excerpts (default 8000).
+
+    Returns:
+        Dict with 'ticker', 'keywords', 'excerpts' list, and 'total_excerpts_found'.
+    """
+    ticker_upper = ticker.upper().strip()
+    ticker_dir = os.path.join(FINANCIAL_FILES_DIR, ticker_upper)
+
+    if not os.path.isdir(ticker_dir):
+        return {
+            "ticker": ticker_upper,
+            "keywords": keywords,
+            "excerpts": [],
+            "total_excerpts_found": 0,
+            "message": f"No filings directory found for {ticker_upper}.",
+        }
+
+    kw_list = [k.lower() for k in keywords.split() if k.strip()]
+    if not kw_list:
+        return {"ticker": ticker_upper, "keywords": keywords, "excerpts": [], "total_excerpts_found": 0}
+
+    excerpts = []
+    chars_used = 0
+
+    # Walk filing subdirectories; sort descending so newest files come first
+    try:
+        subdirs = sorted(os.listdir(ticker_dir))
+    except Exception:
+        subdirs = []
+
+    for subdir in subdirs:
+        subdir_path = os.path.join(ticker_dir, subdir)
+        if not os.path.isdir(subdir_path):
+            continue
+        try:
+            fnames = sorted(os.listdir(subdir_path), reverse=True)
+        except Exception:
+            continue
+        for fname in fnames:
+            fpath = os.path.join(subdir_path, fname)
+            if not os.path.isfile(fpath):
+                continue
+            try:
+                with open(fpath, "r", encoding="utf-8", errors="replace") as fh:
+                    raw = fh.read()
+                if fpath.lower().endswith((".htm", ".html")):
+                    raw = _strip_html(raw)
+                paragraphs = [p.strip() for p in re.split(r"\n{2,}", raw) if len(p.strip()) > 40]
+                for para in paragraphs:
+                    if all(kw in para.lower() for kw in kw_list):
+                        excerpt = para[:500] + "…" if len(para) > 500 else para
+                        excerpts.append({"file": os.path.join(subdir, fname), "text": excerpt})
+                        chars_used += len(excerpt)
+                        if chars_used >= max_chars:
+                            break
+            except Exception:
+                continue
+            if chars_used >= max_chars:
+                break
+        if chars_used >= max_chars:
+            break
+
+    return {
+        "ticker": ticker_upper,
+        "keywords": keywords,
+        "excerpts": excerpts[:20],
+        "total_excerpts_found": len(excerpts),
+    }
+
+
 # ── Domain-specific savers ────────────────────────────────────────────────────
 
 def save_financial_data(company: str, ticker: str, content: str) -> dict:
@@ -222,6 +355,87 @@ SAVE_FILE_TOOL = {
             "content": {"type": "string", "description": "Text content to save."},
         },
         "required": ["filepath", "content"],
+    },
+}
+
+SAVE_COMPANY_FACTS_TOOL = {
+    "name": "save_company_facts",
+    "description": (
+        "Save structured CompanyFacts JSON for one company to "
+        "Financial Data/{TICKER}_facts_latest.json. "
+        "Content must be a valid JSON string containing the KPI table and citations. "
+        "Always overwrites the previous version so Agent 3 finds exactly one current file."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "ticker": {"type": "string", "description": "Stock ticker symbol (e.g. 'MSFT')."},
+            "content": {"type": "string", "description": "Valid JSON string with structured financial facts."},
+        },
+        "required": ["ticker", "content"],
+    },
+}
+
+SAVE_COMPANY_BRIEF_TOOL = {
+    "name": "save_company_brief",
+    "description": (
+        "Save a human-readable CompanyBrief markdown file for one company to "
+        "Financial Data/{TICKER}_brief_latest.md. "
+        "Target length: 800–1500 tokens. Covers: what changed, management tone, AI/strategic capex, "
+        "key risks, analyst flags. Always overwrites the previous version."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "ticker": {"type": "string", "description": "Stock ticker symbol (e.g. 'MSFT')."},
+            "content": {"type": "string", "description": "Markdown-formatted company brief (800–1500 tokens)."},
+        },
+        "required": ["ticker", "content"],
+    },
+}
+
+SAVE_QUOTE_BANK_TOOL = {
+    "name": "save_quote_bank",
+    "description": (
+        "Save the QuoteBank JSON (top 5–10 verbatim management quotes) for one company to "
+        "Financial Data/{TICKER}_quote_bank.json. "
+        "Content must be a JSON array of objects with 'speaker', 'context', 'quote', 'relevance' fields."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "ticker": {"type": "string", "description": "Stock ticker symbol (e.g. 'MSFT')."},
+            "content": {"type": "string", "description": "JSON array of quote objects."},
+        },
+        "required": ["ticker", "content"],
+    },
+}
+
+SEARCH_EXCERPTS_TOOL = {
+    "name": "search_excerpts",
+    "description": (
+        "Search raw filings for a ticker and return relevant paragraph-level excerpts matching keywords. "
+        "Use this instead of read_file when you need a specific citation or piece of evidence "
+        "without loading an entire filing. All keywords must appear in a paragraph to match. "
+        "Returns up to 20 excerpts, capped at max_chars total characters."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "ticker": {
+                "type": "string",
+                "description": "Stock ticker symbol (e.g. 'MSFT').",
+            },
+            "keywords": {
+                "type": "string",
+                "description": "Space-separated keywords — all must appear in a paragraph to match.",
+            },
+            "max_chars": {
+                "type": "integer",
+                "description": "Maximum total characters to return across all excerpts. Default 8000.",
+            },
+        },
+        "required": ["ticker", "keywords"],
     },
 }
 
