@@ -137,6 +137,21 @@ View per-agent traces, token usage per company session, tool calls, and thinking
 
 ---
 
+## LLM Provider Configuration
+
+Set `LLM_PROVIDER` in `.env` to switch providers with no code changes:
+
+| Provider | `LLM_PROVIDER` | Notes |
+|----------|---------------|-------|
+| Anthropic Claude | `anthropic` | Supports extended thinking. Set `ANTHROPIC_API_KEY`. |
+| OpenAI | `openai` | Set `OPENAI_BASE_URL=https://api.openai.com/v1`, `OPENAI_API_KEY`, `OPENAI_MODEL`. |
+| Google Gemini | `openai` | Set `OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai`, `OPENAI_API_KEY` (Gemini key), `OPENAI_MODEL=gemini-2.0-flash`. |
+| Local server | `openai` | Set `OPENAI_BASE_URL=http://127.0.0.1:17777/v1`, `OPENAI_MODEL=<model-id>`. |
+
+See `.env.example` for a full template.
+
+---
+
 ## Key Design Principles
 
 - **Cache-first**: Agent 1 never re-downloads filings < 24 months old
@@ -145,7 +160,8 @@ View per-agent traces, token usage per company session, tool calls, and thinking
 - **Isolated sessions**: Agent 2 runs one LLM session per company to prevent context overflow
 - **Compact intermediates**: Agent 3 reads only the pre-extracted summaries (facts + brief + quotes)
 - **Targeted retrieval**: `search_excerpts` provides citation support without full filing ingestion
-- **Adaptive thinking**: Agents 2 and 3 use extended thinking for deeper analytical reasoning
+- **Adaptive thinking**: Agents 2 and 3 use extended thinking (Anthropic only) for deeper reasoning
+- **Configurable LLM**: Switch between Anthropic, OpenAI, Gemini, or any local server via `.env`
 - **Observability**: Every API call is traced via Arize Phoenix
 
 ---

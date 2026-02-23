@@ -1,4 +1,13 @@
-"""Ollama adapter — uses the OpenAI-compatible endpoint served by Ollama."""
+"""OpenAI-compatible adapter.
+
+Works with any endpoint that speaks the OpenAI Chat Completions API:
+  - OpenAI          (OPENAI_BASE_URL=https://api.openai.com/v1)
+  - Gemini          (OPENAI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai)
+  - Local server    (OPENAI_BASE_URL=http://127.0.0.1:17777/v1)
+  - Any vLLM / LM Studio / similar
+
+Extended thinking is silently ignored — it is an Anthropic-only feature.
+"""
 
 import json
 
@@ -8,7 +17,7 @@ from .base import BaseLLMAdapter, LLMResponse, ToolCall
 
 
 def _convert_tools(tools: list) -> list:
-    """Convert Anthropic-format tool defs to OpenAI function format."""
+    """Convert Anthropic-format tool definitions to OpenAI function format."""
     return [
         {
             "type": "function",
@@ -30,15 +39,15 @@ def _finish_to_stop_reason(finish_reason: str, has_tool_calls: bool) -> str:
     return "other"
 
 
-class OllamaAdapter(BaseLLMAdapter):
-    """Calls a locally-running Ollama instance via its OpenAI-compatible API."""
+class OpenAIAdapter(BaseLLMAdapter):
+    """Calls any OpenAI-compatible endpoint."""
 
-    def __init__(self, model: str, base_url: str):
+    def __init__(self, model: str, base_url: str, api_key: str):
         self.model = model
-        self.client = OpenAI(base_url=f"{base_url}/v1", api_key="ollama")
+        self.client = OpenAI(base_url=base_url, api_key=api_key or "none")
 
     def chat(self, messages, system, tools, thinking: bool = False) -> LLMResponse:
-        # Ollama/OpenAI uses a system message rather than a top-level param
+        # Thinking is an Anthropic-only feature; ignored here
         all_messages = [{"role": "system", "content": system}] + messages
         converted_tools = _convert_tools(tools) if tools else None
 
@@ -86,7 +95,7 @@ class OllamaAdapter(BaseLLMAdapter):
     def make_tool_results_messages(
         self, tool_calls: list[ToolCall], results: list[str]
     ) -> list[dict]:
-        # OpenAI/Ollama expects one message per tool result
+        # OpenAI expects one message per tool result
         return [
             {"role": "tool", "tool_call_id": tc.id, "content": result}
             for tc, result in zip(tool_calls, results)

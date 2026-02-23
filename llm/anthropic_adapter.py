@@ -19,7 +19,7 @@ class AnthropicAdapter(BaseLLMAdapter):
 
         if use_thinking:
             raw = self.client.beta.messages.create(
-                model=config.MODEL,
+                model=config.ANTHROPIC_MODEL,
                 max_tokens=config.MAX_TOKENS,
                 thinking={"type": "enabled", "budget_tokens": self.thinking_budget},
                 system=system,
@@ -29,7 +29,7 @@ class AnthropicAdapter(BaseLLMAdapter):
             )
         else:
             raw = self.client.messages.create(
-                model=config.MODEL,
+                model=config.ANTHROPIC_MODEL,
                 max_tokens=config.MAX_TOKENS,
                 system=system,
                 tools=tools,

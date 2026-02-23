@@ -1,18 +1,28 @@
-"""Factory that returns the correct adapter based on LLM_PROVIDER config."""
+"""Factory that returns the correct LLM adapter based on LLM_PROVIDER config."""
 
 import config
 from .base import BaseLLMAdapter
 from .anthropic_adapter import AnthropicAdapter
-from .ollama_adapter import OllamaAdapter
+from .openai_adapter import OpenAIAdapter
 
 
 def create_adapter(thinking: bool = False, thinking_budget: int = 8000) -> BaseLLMAdapter:
-    """Return an LLM adapter configured from environment variables.
+    """Return a configured LLM adapter.
+
+    Provider is selected by the LLM_PROVIDER environment variable:
+      "anthropic"  — Anthropic Claude (supports extended thinking)
+      "openai"     — OpenAI or any OpenAI-compatible endpoint
+                     (extended thinking is silently ignored)
 
     Args:
-        thinking: Enable extended thinking (Anthropic only; ignored for Ollama).
+        thinking: Request extended thinking (Anthropic only).
         thinking_budget: Token budget for thinking (Anthropic only).
     """
-    if config.LLM_PROVIDER == "ollama":
-        return OllamaAdapter(model=config.LOCAL_MODEL, base_url=config.OLLAMA_BASE_URL)
+    if config.LLM_PROVIDER == "openai":
+        return OpenAIAdapter(
+            model=config.OPENAI_MODEL,
+            base_url=config.OPENAI_BASE_URL,
+            api_key=config.OPENAI_API_KEY,
+        )
+    # Default: Anthropic
     return AnthropicAdapter(thinking=thinking, thinking_budget=thinking_budget)
