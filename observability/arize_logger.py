@@ -1,15 +1,17 @@
 """Arize Phoenix observability — connects to a running Phoenix server and
-instruments all Anthropic and OpenAI (Ollama) SDK calls."""
+instruments all Anthropic and OpenAI SDK calls."""
 
 import sys
 
-PHOENIX_ENDPOINT = "http://localhost:6006/v1/traces"
+PHOENIX_ENDPOINT   = "http://localhost:6006/v1/traces"
+PHOENIX_PROJECT    = "buy-side-financial-analyst"
 
 
 def setup_observability():
     """Register OTLP exporters and instrument LLM SDKs.
 
     Connects to the already-running Phoenix server at http://localhost:6006.
+    All traces are routed to the '{PHOENIX_PROJECT}' project in Phoenix.
     Does NOT attempt to launch a new Phoenix process.
 
     Returns:
@@ -17,12 +19,15 @@ def setup_observability():
     """
     try:
         from opentelemetry import trace
+        from opentelemetry.sdk.resources import Resource
         from opentelemetry.sdk.trace import TracerProvider
         from opentelemetry.sdk.trace.export import BatchSpanProcessor
         from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 
-        # Build a provider that sends spans to the running Phoenix instance
-        provider = TracerProvider()
+        # Tag every span with the Phoenix project name so traces appear under
+        # the correct project rather than the Phoenix default project.
+        resource = Resource({"phoenix.project.name": PHOENIX_PROJECT})
+        provider = TracerProvider(resource=resource)
         exporter = OTLPSpanExporter(endpoint=PHOENIX_ENDPOINT)
         provider.add_span_processor(BatchSpanProcessor(exporter))
 
@@ -33,7 +38,7 @@ def setup_observability():
         _instrument_openai(provider)
 
         print(
-            f"[Observability] Tracing → Arize Phoenix at http://localhost:6006",
+            f"[Observability] Tracing → Phoenix project '{PHOENIX_PROJECT}' at http://localhost:6006",
             file=sys.stderr,
         )
         return True
@@ -60,7 +65,7 @@ def _instrument_anthropic(provider):
 
 
 def _instrument_openai(provider):
-    """Instrument the OpenAI SDK (used by Ollama adapter) if available."""
+    """Instrument the OpenAI SDK (used by the OpenAI-compatible adapter) if available."""
     try:
         from openinference.instrumentation.openai import OpenAIInstrumentor
         OpenAIInstrumentor().instrument(tracer_provider=provider)
