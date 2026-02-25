@@ -1,5 +1,6 @@
 """Agent 4 — Visualization Agent: generates charts from Agent 3's viz specs."""
 
+import os
 import sys
 
 from config import MAX_AGENT_TURNS, FINANCIAL_DATA_DIR, FINANCIAL_ANALYSES_DIR
@@ -32,10 +33,11 @@ class VisualizationAgent:
             file=sys.stderr,
         )
 
+        financial_data_dir = os.path.join(FINANCIAL_DATA_DIR, self.project)
         user_message = build_agent4_message(
             self.project,
             self.viz_specs,
-            FINANCIAL_DATA_DIR,
+            financial_data_dir,
             FINANCIAL_ANALYSES_DIR,
         )
         messages = [{"role": "user", "content": user_message}]

@@ -45,13 +45,11 @@ AGENT1_TOOL_DEFINITIONS = [
     LIST_FILES_TOOL,
 ]
 
-# Agent 2: reads at most 2 raw filings per company, writes 3 compact output files.
+# Agent 2: reads at most 2 raw filings per company, outputs 3 structured sections in
+# plain text.  File saving is handled by the orchestrator — NOT by LLM tool calls.
 AGENT2_TOOL_DEFINITIONS = [
     LIST_FILES_TOOL,
     READ_FILE_TOOL,
-    SAVE_COMPANY_FACTS_TOOL,
-    SAVE_COMPANY_BRIEF_TOOL,
-    SAVE_QUOTE_BANK_TOOL,
 ]
 
 # Agent 3: reads only compact summary files; uses search_excerpts for targeted citations.
@@ -87,9 +85,6 @@ AGENT1_FUNCTIONS = {
 AGENT2_FUNCTIONS = {
     "list_files": list_files,
     "read_file": read_file,
-    "save_company_facts": save_company_facts,
-    "save_company_brief": save_company_brief,
-    "save_quote_bank": save_quote_bank,
 }
 
 AGENT3_FUNCTIONS = {

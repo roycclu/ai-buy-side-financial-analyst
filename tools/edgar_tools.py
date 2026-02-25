@@ -91,19 +91,20 @@ def lookup_cik(ticker: str, company_name: str = "") -> dict:
 
 # ── Local Cache Check ─────────────────────────────────────────────────────────
 
-def check_local_cache(ticker: str, filing_type: str) -> dict:
+def check_local_cache(ticker: str, filing_type: str, project: str) -> dict:
     """Check whether filings for a ticker/type are already cached locally.
 
     Args:
         ticker: Stock ticker symbol.
         filing_type: Filing type, e.g. '10-K', '10-Q'.
+        project: Project name (used as parent subfolder under Financial Files).
 
     Returns:
         Dict with 'ticker', 'filing_type', 'cached_files' list, 'cache_fresh' bool.
     """
     ticker = ticker.upper().strip()
     filing_type_safe = filing_type.replace("-", "").replace("/", "_")
-    cache_dir = os.path.join(FINANCIAL_FILES_DIR, ticker, filing_type_safe)
+    cache_dir = os.path.join(FINANCIAL_FILES_DIR, project, ticker, filing_type_safe)
 
     if not os.path.isdir(cache_dir):
         return {
@@ -212,7 +213,7 @@ def search_sec_edgar(ticker: str, cik: str, filing_type: str, months_back: int =
 
 # ── Download Filing ───────────────────────────────────────────────────────────
 
-def download_filing(url: str, ticker: str, filing_type: str, filename: str) -> dict:
+def download_filing(url: str, ticker: str, filing_type: str, filename: str, project: str) -> dict:
     """Download a filing document and save it to the local cache.
 
     Args:
@@ -220,13 +221,14 @@ def download_filing(url: str, ticker: str, filing_type: str, filename: str) -> d
         ticker: Stock ticker symbol (used to organise storage).
         filing_type: Filing type (e.g. '10-K').
         filename: Desired filename for the saved file.
+        project: Project name (used as parent subfolder under Financial Files).
 
     Returns:
         Dict with 'success', 'filepath', and 'bytes_saved' or 'error'.
     """
     ticker = ticker.upper().strip()
     filing_type_safe = filing_type.replace("-", "").replace("/", "_")
-    save_dir = os.path.join(FINANCIAL_FILES_DIR, ticker, filing_type_safe)
+    save_dir = os.path.join(FINANCIAL_FILES_DIR, project, ticker, filing_type_safe)
     os.makedirs(save_dir, exist_ok=True)
 
     # Sanitise filename
@@ -300,8 +302,12 @@ CHECK_CACHE_TOOL = {
                 "enum": ["10-K", "10-Q", "8-K", "DEF 14A"],
                 "description": "Filing type to check.",
             },
+            "project": {
+                "type": "string",
+                "description": "Project name (parent subfolder under Financial Files).",
+            },
         },
-        "required": ["ticker", "filing_type"],
+        "required": ["ticker", "filing_type", "project"],
     },
 }
 
@@ -362,7 +368,11 @@ DOWNLOAD_FILING_TOOL = {
                 "type": "string",
                 "description": "Desired filename for the saved file (include extension).",
             },
+            "project": {
+                "type": "string",
+                "description": "Project name (parent subfolder under Financial Files).",
+            },
         },
-        "required": ["url", "ticker", "filing_type", "filename"],
+        "required": ["url", "ticker", "filing_type", "filename", "project"],
     },
 }

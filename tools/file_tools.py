@@ -117,59 +117,62 @@ def save_file(filepath: str, content: str) -> dict:
 
 # ── Compact-output savers (new architecture) ──────────────────────────────────
 
-def save_company_facts(ticker: str, content: str) -> dict:
+def save_company_facts(ticker: str, content: str, project: str) -> dict:
     """Save structured CompanyFacts JSON for a company.
 
-    Always writes to Financial Data/{TICKER}_facts_latest.json, overwriting any
+    Writes to Financial Data/{project}/{TICKER}_facts_latest.json, overwriting any
     previous version so Agent 3 always finds exactly one current file per ticker.
 
     Args:
         ticker: Stock ticker symbol (e.g. 'MSFT').
         content: JSON string with structured KPIs and citations.
+        project: Project name (parent subfolder under Financial Data).
 
     Returns:
         Dict with 'success' and 'filepath'.
     """
     ticker_upper = ticker.upper().strip()
-    filepath = os.path.join(FINANCIAL_DATA_DIR, f"{ticker_upper}_facts_latest.json")
+    filepath = os.path.join(FINANCIAL_DATA_DIR, project, f"{ticker_upper}_facts_latest.json")
     return save_file(filepath, content)
 
 
-def save_company_brief(ticker: str, content: str) -> dict:
+def save_company_brief(ticker: str, content: str, project: str) -> dict:
     """Save human-readable CompanyBrief markdown for a company.
 
-    Always writes to Financial Data/{TICKER}_brief_latest.md (target 800-1500 tokens).
+    Writes to Financial Data/{project}/{TICKER}_brief_latest.md (target 800-1500 tokens).
 
     Args:
         ticker: Stock ticker symbol (e.g. 'MSFT').
         content: Markdown-formatted company brief.
+        project: Project name (parent subfolder under Financial Data).
 
     Returns:
         Dict with 'success' and 'filepath'.
     """
     ticker_upper = ticker.upper().strip()
-    filepath = os.path.join(FINANCIAL_DATA_DIR, f"{ticker_upper}_brief_latest.md")
+    filepath = os.path.join(FINANCIAL_DATA_DIR, project, f"{ticker_upper}_brief_latest.md")
     return save_file(filepath, content)
 
 
-def save_quote_bank(ticker: str, content: str) -> dict:
+def save_quote_bank(ticker: str, content: str, project: str) -> dict:
     """Save the QuoteBank JSON (top 5-10 verbatim management quotes) for a company.
 
-    Always writes to Financial Data/{TICKER}_quote_bank.json.
+    Writes to Financial Data/{project}/{TICKER}_quote_bank.json.
 
     Args:
         ticker: Stock ticker symbol (e.g. 'MSFT').
         content: JSON array of quote objects with 'quote', 'speaker', 'context' fields.
+        project: Project name (parent subfolder under Financial Data).
 
     Returns:
         Dict with 'success' and 'filepath'.
     """
     ticker_upper = ticker.upper().strip()
-    filepath = os.path.join(FINANCIAL_DATA_DIR, f"{ticker_upper}_quote_bank.json")
+    filepath = os.path.join(FINANCIAL_DATA_DIR, project, f"{ticker_upper}_quote_bank.json")
     return save_file(filepath, content)
 
 
-def search_excerpts(ticker: str, keywords: str, max_chars: int = 8000) -> dict:
+def search_excerpts(ticker: str, keywords: str, project: str, max_chars: int = 8000) -> dict:
     """Search raw filings for a ticker and return relevant text excerpts.
 
     Finds paragraphs containing ALL the given keywords (case-insensitive).  Useful for
@@ -178,13 +181,14 @@ def search_excerpts(ticker: str, keywords: str, max_chars: int = 8000) -> dict:
     Args:
         ticker: Stock ticker symbol (e.g. 'MSFT').
         keywords: Space-separated keywords (all must appear in a paragraph to match).
+        project: Project name (parent subfolder under Financial Files).
         max_chars: Maximum total characters to return across all excerpts (default 8000).
 
     Returns:
         Dict with 'ticker', 'keywords', 'excerpts' list, and 'total_excerpts_found'.
     """
     ticker_upper = ticker.upper().strip()
-    ticker_dir = os.path.join(FINANCIAL_FILES_DIR, ticker_upper)
+    ticker_dir = os.path.join(FINANCIAL_FILES_DIR, project, ticker_upper)
 
     if not os.path.isdir(ticker_dir):
         return {
@@ -250,7 +254,7 @@ def search_excerpts(ticker: str, keywords: str, max_chars: int = 8000) -> dict:
 
 # ── Domain-specific savers ────────────────────────────────────────────────────
 
-def save_financial_data(company: str, ticker: str, content: str) -> dict:
+def save_financial_data(company: str, ticker: str, content: str, project: str) -> dict:
     """Save extracted financial metrics to the Financial Data directory.
 
     Filename pattern: {Company}_{TICKER}_{YYYY-MM-DD}.md
@@ -259,6 +263,7 @@ def save_financial_data(company: str, ticker: str, content: str) -> dict:
         company: Full company name (spaces replaced with underscores).
         ticker: Stock ticker symbol.
         content: Markdown-formatted financial metrics.
+        project: Project name (parent subfolder under Financial Data).
 
     Returns:
         Dict with 'success' and 'filepath'.
@@ -267,7 +272,7 @@ def save_financial_data(company: str, ticker: str, content: str) -> dict:
     company_safe = company.replace(" ", "_").replace("/", "_")
     ticker_upper = ticker.upper().strip()
     filename = f"{company_safe}_{ticker_upper}_{date_str}.md"
-    filepath = os.path.join(FINANCIAL_DATA_DIR, filename)
+    filepath = os.path.join(FINANCIAL_DATA_DIR, project, filename)
     return save_file(filepath, content)
 
 
@@ -362,7 +367,7 @@ SAVE_COMPANY_FACTS_TOOL = {
     "name": "save_company_facts",
     "description": (
         "Save structured CompanyFacts JSON for one company to "
-        "Financial Data/{TICKER}_facts_latest.json. "
+        "Financial Data/{project}/{TICKER}_facts_latest.json. "
         "Content must be a valid JSON string containing the KPI table and citations. "
         "Always overwrites the previous version so Agent 3 finds exactly one current file."
     ),
@@ -371,8 +376,9 @@ SAVE_COMPANY_FACTS_TOOL = {
         "properties": {
             "ticker": {"type": "string", "description": "Stock ticker symbol (e.g. 'MSFT')."},
             "content": {"type": "string", "description": "Valid JSON string with structured financial facts."},
+            "project": {"type": "string", "description": "Project name (parent subfolder under Financial Data)."},
         },
-        "required": ["ticker", "content"],
+        "required": ["ticker", "content", "project"],
     },
 }
 
@@ -380,7 +386,7 @@ SAVE_COMPANY_BRIEF_TOOL = {
     "name": "save_company_brief",
     "description": (
         "Save a human-readable CompanyBrief markdown file for one company to "
-        "Financial Data/{TICKER}_brief_latest.md. "
+        "Financial Data/{project}/{TICKER}_brief_latest.md. "
         "Target length: 800–1500 tokens. Covers: what changed, management tone, AI/strategic capex, "
         "key risks, analyst flags. Always overwrites the previous version."
     ),
@@ -389,8 +395,9 @@ SAVE_COMPANY_BRIEF_TOOL = {
         "properties": {
             "ticker": {"type": "string", "description": "Stock ticker symbol (e.g. 'MSFT')."},
             "content": {"type": "string", "description": "Markdown-formatted company brief (800–1500 tokens)."},
+            "project": {"type": "string", "description": "Project name (parent subfolder under Financial Data)."},
         },
-        "required": ["ticker", "content"],
+        "required": ["ticker", "content", "project"],
     },
 }
 
@@ -398,7 +405,7 @@ SAVE_QUOTE_BANK_TOOL = {
     "name": "save_quote_bank",
     "description": (
         "Save the QuoteBank JSON (top 5–10 verbatim management quotes) for one company to "
-        "Financial Data/{TICKER}_quote_bank.json. "
+        "Financial Data/{project}/{TICKER}_quote_bank.json. "
         "Content must be a JSON array of objects with 'speaker', 'context', 'quote', 'relevance' fields."
     ),
     "input_schema": {
@@ -406,8 +413,9 @@ SAVE_QUOTE_BANK_TOOL = {
         "properties": {
             "ticker": {"type": "string", "description": "Stock ticker symbol (e.g. 'MSFT')."},
             "content": {"type": "string", "description": "JSON array of quote objects."},
+            "project": {"type": "string", "description": "Project name (parent subfolder under Financial Data)."},
         },
-        "required": ["ticker", "content"],
+        "required": ["ticker", "content", "project"],
     },
 }
 
@@ -430,12 +438,16 @@ SEARCH_EXCERPTS_TOOL = {
                 "type": "string",
                 "description": "Space-separated keywords — all must appear in a paragraph to match.",
             },
+            "project": {
+                "type": "string",
+                "description": "Project name (parent subfolder under Financial Files).",
+            },
             "max_chars": {
                 "type": "integer",
                 "description": "Maximum total characters to return across all excerpts. Default 8000.",
             },
         },
-        "required": ["ticker", "keywords"],
+        "required": ["ticker", "keywords", "project"],
     },
 }
 

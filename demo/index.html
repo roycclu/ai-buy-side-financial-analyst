@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Buy-Side Financial Analyst — AI Agent Team</title>
+  <style>
+    :root {
+      --bg:        #0d1117;
+      --surface:   #161b22;
+      --surface2:  #1f2937;
+      --border:    #30363d;
+      --accent:    #58a6ff;
+      --accent2:   #3fb950;
+      --accent3:   #d29922;
+      --accent4:   #f85149;
+      --text:      #e6edf3;
+      --muted:     #8b949e;
+      --tag-bg:    #1f3a5f;
+      --tag-text:  #79c0ff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    /* ── Header ── */
+    header {
+      background: linear-gradient(135deg, #0d1117 0%, #1a2744 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 48px 24px 40px;
+      text-align: center;
+    }
+    header .badge {
+      display: inline-block;
+      background: var(--tag-bg);
+      color: var(--tag-text);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 20px;
+      margin-bottom: 16px;
+    }
+    header h1 {
+      font-size: clamp(24px, 4vw, 42px);
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 12px;
+      letter-spacing: -.02em;
+    }
+    header p {
+      color: var(--muted);
+      font-size: 16px;
+      max-width: 640px;
+      margin: 0 auto;
+    }
+
+    /* ── Nav ── */
+    nav {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      padding: 16px 24px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+    nav a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      padding: 6px 14px;
+      border-radius: 6px;
+      transition: all .15s;
+    }
+    nav a:hover, nav a.active { background: var(--surface2); color: var(--text); }
+
+    /* ── Sections ── */
+    section {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 56px 24px;
+    }
+    section + section { border-top: 1px solid var(--border); }
+    .section-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+    h2 {
+      font-size: clamp(20px, 3vw, 28px);
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: -.02em;
+    }
+    .subtitle {
+      color: var(--muted);
+      font-size: 15px;
+      margin-bottom: 40px;
+    }
+
+    /* ── Workflow diagram ── */
+    .workflow-wrap {
+      overflow-x: auto;
+      padding: 8px 0 16px;
+    }
+    .workflow-svg {
+      display: block;
+      margin: 0 auto;
+      min-width: 700px;
+    }
+
+    /* ── Agent cards (legend) ── */
+    .agent-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 16px;
+      margin-top: 40px;
+    }
+    .agent-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px;
+    }
+    .agent-card .num {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .agent-card h3 {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .agent-card p { font-size: 13px; color: var(--muted); }
+    .c0 .num { color: #a78bfa; }
+    .c1 .num { color: var(--accent); }
+    .c2 .num { color: var(--accent3); }
+    .c3 .num { color: var(--accent2); }
+    .c4 .num { color: #fb7185; }
+
+    /* ── Data flow table ── */
+    .flow-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 32px;
+      font-size: 14px;
+    }
+    .flow-table th {
+      text-align: left;
+      padding: 10px 16px;
+      background: var(--surface2);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      border: 1px solid var(--border);
+    }
+    .flow-table td {
+      padding: 12px 16px;
+      border: 1px solid var(--border);
+      vertical-align: top;
+    }
+    .flow-table tr:hover td { background: var(--surface); }
+    code {
+      background: #1e2a3a;
+      color: #79c0ff;
+      font-family: 'SFMono-Regular', Consolas, monospace;
+      font-size: 12px;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .tag { display: inline-block; background: var(--tag-bg); color: var(--tag-text);
+           font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px;
+           margin: 2px 2px 2px 0; }
+
+    /* ── Company tabs ── */
+    .tabs { display: flex; gap: 4px; margin-bottom: 24px; flex-wrap: wrap; }
+    .tab-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .tab-btn:hover { border-color: var(--accent); color: var(--text); }
+    .tab-btn.active { background: var(--accent); border-color: var(--accent); color: #000; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── KPI grid ── */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+    .kpi-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+    .kpi-label { font-size: 11px; color: var(--muted); font-weight: 600;
+                 text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px; }
+    .kpi-value { font-size: 20px; font-weight: 700; color: var(--text); }
+    .kpi-value.green { color: var(--accent2); }
+    .kpi-value.amber { color: var(--accent3); }
+
+    /* ── Brief & quotes ── */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    @media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 24px;
+    }
+    .panel h3 {
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+    .brief-body { font-size: 14px; line-height: 1.75; color: var(--text); }
+    .brief-body h2 { font-size: 17px; margin-bottom: 6px; color: var(--accent); }
+    .brief-body h3 { font-size: 14px; font-weight: 700; margin: 16px 0 6px; color: var(--accent3); }
+    .brief-body ul { padding-left: 18px; }
+    .brief-body li { margin-bottom: 4px; }
+    .brief-body strong { color: #fff; }
+    .brief-meta { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+
+    /* ── Quote cards ── */
+    .quote-list { display: flex; flex-direction: column; gap: 14px; }
+    .quote-card {
+      background: var(--surface2);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 8px 8px 0;
+      padding: 14px 16px;
+    }
+    .quote-text { font-size: 14px; font-style: italic; margin-bottom: 8px; color: var(--text); }
+    .quote-meta { font-size: 12px; color: var(--muted); }
+    .quote-meta strong { color: var(--accent); font-style: normal; }
+    .quote-relevance {
+      display: inline-block;
+      font-size: 10px;
+      background: #1a3a1f;
+      color: var(--accent2);
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-weight: 600;
+      margin-top: 6px;
+    }
+
+    /* ── Architecture note ── */
+    .arch-note {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--accent2);
+      border-radius: 8px;
+      padding: 20px 24px;
+      font-size: 14px;
+      margin-bottom: 32px;
+    }
+    .arch-note h4 { font-size: 14px; font-weight: 700; margin-bottom: 8px; color: var(--accent2); }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center;
+      padding: 32px 24px;
+      color: var(--muted);
+      font-size: 13px;
+      border-top: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="badge">Multi-Agent AI System</div>
+  <h1>Buy-Side Financial Analyst</h1>
+  <p>A five-agent AI team that autonomously fetches SEC filings, extracts financial data,
+     writes investment analyses, and generates visualizations.</p>
+</header>
+
+<nav>
+  <a href="#workflow" class="active">Workflow</a>
+  <a href="#data-flow">Data Flow</a>
+  <a href="#analyses">Sample Analyses</a>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════ WORKFLOW -->
+<section id="workflow">
+  <div class="section-label">Architecture</div>
+  <h2>Agent Collaboration Workflow</h2>
+  <p class="subtitle">Five specialized agents collaborate sequentially, each handing off structured
+     artifacts to the next stage.</p>
+
+  <div class="workflow-wrap">
+    <svg class="workflow-svg" viewBox="0 0 960 420" width="960" height="420"
+         xmlns="http://www.w3.org/2000/svg" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+
+      <!-- Background panels -->
+      <rect width="960" height="420" fill="#0d1117"/>
+
+      <!-- ── Phase labels ── -->
+      <text x="88"  y="30" fill="#8b949e" font-size="10" font-weight="700" text-anchor="middle" letter-spacing="1">SETUP</text>
+      <text x="248" y="30" fill="#8b949e" font-size="10" font-weight="700" text-anchor="middle" letter-spacing="1">COLLECT</text>
+      <text x="408" y="30" fill="#8b949e" font-size="10" font-weight="700" text-anchor="middle" letter-spacing="1">EXTRACT</text>
+      <text x="568" y="30" fill="#8b949e" font-size="10" font-weight="700" text-anchor="middle" letter-spacing="1">ANALYSE</text>
+      <text x="728" y="30" fill="#8b949e" font-size="10" font-weight="700" text-anchor="middle" letter-spacing="1">VISUALISE</text>
+      <!-- phase dividers -->
+      <line x1="168" y1="15" x2="168" y2="420" stroke="#30363d" stroke-width="1" stroke-dasharray="4,4"/>
+      <line x1="328" y1="15" x2="328" y2="420" stroke="#30363d" stroke-width="1" stroke-dasharray="4,4"/>
+      <line x1="488" y1="15" x2="488" y2="420" stroke="#30363d" stroke-width="1" stroke-dasharray="4,4"/>
+      <line x1="648" y1="15" x2="648" y2="420" stroke="#30363d" stroke-width="1" stroke-dasharray="4,4"/>
+
+      <!-- ── Connector arrows ── -->
+      <!-- A0 → A1 -->
+      <line x1="140" y1="155" x2="196" y2="155" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arr)"/>
+      <!-- A1 → A2 -->
+      <line x1="300" y1="155" x2="356" y2="155" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arr)"/>
+      <!-- A2 → A3 -->
+      <line x1="460" y1="155" x2="516" y2="155" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arr)"/>
+      <!-- A3 → A4 -->
+      <line x1="620" y1="155" x2="676" y2="155" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arr)"/>
+
+      <!-- ── File store boxes ── -->
+      <!-- Financial Files/ -->
+      <rect x="196" y="280" width="132" height="50" rx="6" fill="#1f2937" stroke="#30363d"/>
+      <text x="262" y="301" fill="#8b949e" font-size="9" font-weight="700" text-anchor="middle" letter-spacing=".8">FILE STORE</text>
+      <text x="262" y="318" fill="#79c0ff" font-size="11" font-weight="600" text-anchor="middle">Financial Files/</text>
+      <!-- A1 down -->
+      <line x1="248" y1="196" x2="248" y2="280" stroke="#30363d" stroke-width="1.5" stroke-dasharray="3,3" marker-end="url(#arr-g)"/>
+      <!-- A2 read -->
+      <line x1="408" y1="280" x2="328" y2="196" stroke="#30363d" stroke-width="1.5" stroke-dasharray="3,3" marker-end="url(#arr-g)"/>
+
+      <!-- Financial Data/ -->
+      <rect x="356" y="280" width="132" height="50" rx="6" fill="#1f2937" stroke="#30363d"/>
+      <text x="422" y="301" fill="#8b949e" font-size="9" font-weight="700" text-anchor="middle" letter-spacing=".8">FILE STORE</text>
+      <text x="422" y="318" fill="#d29922" font-size="11" font-weight="600" text-anchor="middle">Financial Data/</text>
+      <!-- A2 down -->
+      <line x1="408" y1="196" x2="408" y2="280" stroke="#30363d" stroke-width="1.5" stroke-dasharray="3,3" marker-end="url(#arr-g)"/>
+      <!-- A3 read -->
+      <line x1="568" y1="280" x2="488" y2="196" stroke="#30363d" stroke-width="1.5" stroke-dasharray="3,3" marker-end="url(#arr-g)"/>
+
+      <!-- Financial Analyses/ -->
+      <rect x="516" y="280" width="132" height="50" rx="6" fill="#1f2937" stroke="#30363d"/>
+      <text x="582" y="301" fill="#8b949e" font-size="9" font-weight="700" text-anchor="middle" letter-spacing=".8">FILE STORE</text>
+      <text x="582" y="318" fill="#3fb950" font-size="11" font-weight="600" text-anchor="middle">Financial Analyses/</text>
+      <!-- A3 down -->
+      <line x1="568" y1="196" x2="568" y2="280" stroke="#30363d" stroke-width="1.5" stroke-dasharray="3,3" marker-end="url(#arr-g)"/>
+      <!-- A4 read -->
+      <line x1="728" y1="280" x2="648" y2="196" stroke="#30363d" stroke-width="1.5" stroke-dasharray="3,3" marker-end="url(#arr-g)"/>
+
+      <!-- Visualizations/ -->
+      <rect x="676" y="280" width="132" height="50" rx="6" fill="#1f2937" stroke="#30363d"/>
+      <text x="742" y="301" fill="#8b949e" font-size="9" font-weight="700" text-anchor="middle" letter-spacing=".8">FILE STORE</text>
+      <text x="742" y="318" fill="#fb7185" font-size="11" font-weight="600" text-anchor="middle">visualizations/</text>
+      <!-- A4 down -->
+      <line x1="728" y1="196" x2="728" y2="280" stroke="#30363d" stroke-width="1.5" stroke-dasharray="3,3" marker-end="url(#arr-g)"/>
+
+      <!-- ── Human input arrow to A0 ── -->
+      <line x1="36" y1="155" x2="88" y2="155" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arr-p)"/>
+      <text x="36" y="151" fill="#a78bfa" font-size="10" text-anchor="middle">User</text>
+      <text x="36" y="163" fill="#a78bfa" font-size="10" text-anchor="middle">Input</text>
+
+      <!-- ── Agent node helper ── -->
+      <!-- Agent 0 — Project Manager -->
+      <rect x="36" y="110" width="104" height="90" rx="10" fill="#1a1428" stroke="#a78bfa" stroke-width="1.5"/>
+      <rect x="36" y="110" width="104" height="28" rx="10" fill="#a78bfa"/>
+      <rect x="36" y="124" width="104" height="14" fill="#a78bfa"/>
+      <text x="88" y="129" fill="#0d0019" font-size="10" font-weight="800" text-anchor="middle">AGENT 0</text>
+      <text x="88" y="151" fill="#e9d8fd" font-size="12" font-weight="700" text-anchor="middle">Project</text>
+      <text x="88" y="165" fill="#e9d8fd" font-size="12" font-weight="700" text-anchor="middle">Manager</text>
+      <text x="88" y="182" fill="#a78bfa" font-size="10" text-anchor="middle">Setup &amp; routing</text>
+
+      <!-- Agent 1 — Research -->
+      <rect x="196" y="110" width="104" height="90" rx="10" fill="#0d1a2d" stroke="#58a6ff" stroke-width="1.5"/>
+      <rect x="196" y="110" width="104" height="28" rx="10" fill="#58a6ff"/>
+      <rect x="196" y="124" width="104" height="14" fill="#58a6ff"/>
+      <text x="248" y="129" fill="#001122" font-size="10" font-weight="800" text-anchor="middle">AGENT 1</text>
+      <text x="248" y="151" fill="#cae8ff" font-size="12" font-weight="700" text-anchor="middle">Research</text>
+      <text x="248" y="165" fill="#cae8ff" font-size="12" font-weight="700" text-anchor="middle">Specialist</text>
+      <text x="248" y="182" fill="#58a6ff" font-size="10" text-anchor="middle">SEC EDGAR fetch</text>
+
+      <!-- Agent 2 — Analyst -->
+      <rect x="356" y="110" width="104" height="90" rx="10" fill="#1a1500" stroke="#d29922" stroke-width="1.5"/>
+      <rect x="356" y="110" width="104" height="28" rx="10" fill="#d29922"/>
+      <rect x="356" y="124" width="104" height="14" fill="#d29922"/>
+      <text x="408" y="129" fill="#1a0f00" font-size="10" font-weight="800" text-anchor="middle">AGENT 2</text>
+      <text x="408" y="151" fill="#fff8dc" font-size="12" font-weight="700" text-anchor="middle">Financial</text>
+      <text x="408" y="165" fill="#fff8dc" font-size="12" font-weight="700" text-anchor="middle">Analyst</text>
+      <text x="408" y="182" fill="#d29922" font-size="10" text-anchor="middle">Extract KPIs</text>
+
+      <!-- Agent 3 — Lead Analyst -->
+      <rect x="516" y="110" width="104" height="90" rx="10" fill="#0d1a10" stroke="#3fb950" stroke-width="1.5"/>
+      <rect x="516" y="110" width="104" height="28" rx="10" fill="#3fb950"/>
+      <rect x="516" y="124" width="104" height="14" fill="#3fb950"/>
+      <text x="568" y="129" fill="#001108" font-size="10" font-weight="800" text-anchor="middle">AGENT 3</text>
+      <text x="568" y="151" fill="#d4f4da" font-size="12" font-weight="700" text-anchor="middle">Lead</text>
+      <text x="568" y="165" fill="#d4f4da" font-size="12" font-weight="700" text-anchor="middle">Analyst</text>
+      <text x="568" y="182" fill="#3fb950" font-size="10" text-anchor="middle">Write reports</text>
+
+      <!-- Agent 4 — Visualization -->
+      <rect x="676" y="110" width="104" height="90" rx="10" fill="#1a0a0a" stroke="#fb7185" stroke-width="1.5"/>
+      <rect x="676" y="110" width="104" height="28" rx="10" fill="#fb7185"/>
+      <rect x="676" y="124" width="104" height="14" fill="#fb7185"/>
+      <text x="728" y="129" fill="#1a0000" font-size="10" font-weight="800" text-anchor="middle">AGENT 4</text>
+      <text x="728" y="151" fill="#ffd4da" font-size="12" font-weight="700" text-anchor="middle">Visualization</text>
+      <text x="728" y="165" fill="#ffd4da" font-size="12" font-weight="700" text-anchor="middle">Specialist</text>
+      <text x="728" y="182" fill="#fb7185" font-size="10" text-anchor="middle">Create charts</text>
+
+      <!-- ── Artifact labels on arrows ── -->
+      <text x="168" y="147" fill="#8b949e" font-size="9" text-anchor="middle">Project</text>
+      <text x="168" y="157" fill="#8b949e" font-size="9" text-anchor="middle">config</text>
+      <text x="328" y="147" fill="#8b949e" font-size="9" text-anchor="middle">Filings</text>
+      <text x="328" y="157" fill="#8b949e" font-size="9" text-anchor="middle">cached</text>
+      <text x="488" y="147" fill="#8b949e" font-size="9" text-anchor="middle">Facts/</text>
+      <text x="488" y="157" fill="#8b949e" font-size="9" text-anchor="middle">Brief/Quotes</text>
+      <text x="648" y="147" fill="#8b949e" font-size="9" text-anchor="middle">Reports +</text>
+      <text x="648" y="157" fill="#8b949e" font-size="9" text-anchor="middle">viz specs</text>
+
+      <!-- ── File labels ── -->
+      <text x="262" y="348" fill="#8b949e" font-size="9" text-anchor="middle">10-K / 10-Q .htm</text>
+      <text x="422" y="348" fill="#8b949e" font-size="9" text-anchor="middle">facts.json · brief.md · quotes.json</text>
+      <text x="582" y="348" fill="#8b949e" font-size="9" text-anchor="middle">analyst_reports/ · sector_reports/</text>
+      <text x="742" y="348" fill="#8b949e" font-size="9" text-anchor="middle">PNG charts</text>
+
+      <!-- ── "Per company" badge on Agent 2 ── -->
+      <rect x="356" y="368" width="104" height="22" rx="6" fill="#1a1500" stroke="#d29922"/>
+      <text x="408" y="383" fill="#d29922" font-size="9" font-weight="700" text-anchor="middle">1 isolated session / co.</text>
+
+      <!-- ── Arrow marker defs ── -->
+      <defs>
+        <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#58a6ff"/>
+        </marker>
+        <marker id="arr-g" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#30363d"/>
+        </marker>
+        <marker id="arr-p" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#a78bfa"/>
+        </marker>
+      </defs>
+    </svg>
+  </div>
+
+  <!-- Agent legend cards -->
+  <div class="agent-grid">
+    <div class="agent-card c0">
+      <div class="num">Agent 0</div>
+      <h3>Project Manager</h3>
+      <p>Collects research requirements from the user, validates inputs, and launches the pipeline with a project config.</p>
+    </div>
+    <div class="agent-card c1">
+      <div class="num">Agent 1</div>
+      <h3>Research Specialist</h3>
+      <p>Queries SEC EDGAR for 10-K and 10-Q filings. Checks the local cache before downloading; rate-limits SEC requests.</p>
+    </div>
+    <div class="agent-card c2">
+      <div class="num">Agent 2</div>
+      <h3>Financial Analyst</h3>
+      <p>Runs one isolated LLM session per company. Reads the two most recent filings and outputs structured KPIs, a company brief, and a quote bank — saved directly by the orchestrator, not by LLM tool calls.</p>
+    </div>
+    <div class="agent-card c3">
+      <div class="num">Agent 3</div>
+      <h3>Lead Analyst</h3>
+      <p>Reads the compact summaries from Agent 2 and writes per-company analyst reports and a sector synthesis that answers the research question.</p>
+    </div>
+    <div class="agent-card c4">
+      <div class="num">Agent 4</div>
+      <h3>Visualization Specialist</h3>
+      <p>Reads structured KPI data and generates comparative bar charts, line charts, and cross-company visualizations as PNG files.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ DATA FLOW -->
+<section id="data-flow">
+  <div class="section-label">Design Principles</div>
+  <h2>Data Flow &amp; File Architecture</h2>
+  <p class="subtitle">Each agent reads and writes to a well-defined directory, enabling caching and incremental re-runs.</p>
+
+  <div class="arch-note">
+    <h4>Key Design: Orchestrator-Managed File Saving (Agent 2)</h4>
+    Agent 2 does not rely on the LLM to call <code>save_company_facts</code> / <code>save_company_brief</code> / <code>save_quote_bank</code> tools.
+    Instead, the LLM outputs three XML-tagged sections (<code>&lt;company_facts&gt;</code>, <code>&lt;company_brief&gt;</code>, <code>&lt;quote_bank&gt;</code>)
+    in its plain-text response, and the Python orchestrator parses and writes the files directly.
+    This eliminates the failure mode where the LLM returns <code>end_turn</code> without having called the save tools.
+  </div>
+
+  <table class="flow-table">
+    <thead>
+      <tr>
+        <th>Agent</th>
+        <th>Reads from</th>
+        <th>Writes to</th>
+        <th>Artifacts produced</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Agent 0</strong> — Project Manager</td>
+        <td>User conversation</td>
+        <td><code>projects/projects.json</code></td>
+        <td><span class="tag">project config</span> <span class="tag">company list</span> <span class="tag">research question</span></td>
+      </tr>
+      <tr>
+        <td><strong>Agent 1</strong> — Research Specialist</td>
+        <td>SEC EDGAR API + local cache</td>
+        <td><code>Financial Files/{project}/{TICKER}/</code></td>
+        <td><span class="tag">10-K .htm</span> <span class="tag">10-Q .htm</span></td>
+      </tr>
+      <tr>
+        <td><strong>Agent 2</strong> — Financial Analyst</td>
+        <td><code>Financial Files/{project}/{TICKER}/</code></td>
+        <td><code>Financial Data/{project}/</code></td>
+        <td>
+          <span class="tag">{TICKER}_facts_latest.json</span>
+          <span class="tag">{TICKER}_brief_latest.md</span>
+          <span class="tag">{TICKER}_quote_bank.json</span>
+        </td>
+      </tr>
+      <tr>
+        <td><strong>Agent 3</strong> — Lead Analyst</td>
+        <td><code>Financial Data/{project}/</code></td>
+        <td><code>Financial Analyses/{project}/</code></td>
+        <td><span class="tag">analyst_reports/*.md</span> <span class="tag">sector_reports/sector_report.md</span></td>
+      </tr>
+      <tr>
+        <td><strong>Agent 4</strong> — Visualization</td>
+        <td><code>Financial Data/{project}/*.json</code></td>
+        <td><code>Financial Analyses/{project}/visualizations/</code></td>
+        <td><span class="tag">*.png charts</span></td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ ANALYSES -->
+<section id="analyses">
+  <div class="section-label">Sample Output — Project: AI Capex 2025</div>
+  <h2>Financial Analyses</h2>
+  <p class="subtitle">Live output extracted from SEC 10-K and 10-Q filings by the agent team.</p>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showTab('msft', this)">MSFT — Microsoft</button>
+    <button class="tab-btn" onclick="showTab('goog', this)">GOOG — Alphabet</button>
+  </div>
+
+  <!-- ── MSFT tab ── -->
+  <div id="tab-msft" class="tab-panel active">
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">Revenue TTM</div>
+        <div class="kpi-value">$261.8B</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Revenue Growth YoY</div>
+        <div class="kpi-value green">+12.3%</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Gross Margin</div>
+        <div class="kpi-value">69.2%</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Operating Margin</div>
+        <div class="kpi-value">44.6%</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Net Margin</div>
+        <div class="kpi-value">38.1%</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">EBITDA TTM</div>
+        <div class="kpi-value">$120.5B</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">EPS Diluted TTM</div>
+        <div class="kpi-value">$12.41</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">FCF TTM</div>
+        <div class="kpi-value">$72.1B</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">CapEx TTM</div>
+        <div class="kpi-value amber">$22.0B</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">CapEx Growth YoY</div>
+        <div class="kpi-value amber">+18.5%</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">R&amp;D Expense TTM</div>
+        <div class="kpi-value">$29.5B</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">ROE</div>
+        <div class="kpi-value green">38.1%</div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="panel">
+        <h3>Company Brief</h3>
+        <div class="brief-meta">Period: FY2025 + Q1 FY2026 &nbsp;|&nbsp; Intelligent Cloud: $73.2B (28% of revenue)</div>
+        <div class="brief-body">
+          <h2>Microsoft Corporation (MSFT) — Quarter Brief</h2>
+          <p><strong>Investment Theme:</strong> Continued emphasis on cloud and AI expansion supports sustained growth.</p>
+
+          <h3>What Changed This Quarter</h3>
+          <ul>
+            <li>Revenue for FY2025 reached $261.8B, a YoY increase of 12.3%.</li>
+            <li>Gross margin improved to 69.2%, reflecting efficiency gains.</li>
+            <li>Operating margin increased to 44.6% due to higher cloud-based services.</li>
+          </ul>
+
+          <h3>Management Tone &amp; Commentary</h3>
+          <p>Management showed strong confidence in their strategic focus on AI and cloud services.
+             CEO Satya Nadella highlighted robust revenue growth in Azure due to increased demand for AI solutions.
+             CFO Amy Hood emphasized significant investments in expanding data center capacity.</p>
+
+          <h3>AI / Strategic CapEx</h3>
+          <p>Microsoft reported CapEx of $22.0B for FY2025, with notable YoY growth of 18.5%,
+             primarily directed towards cloud infrastructure and AI capabilities.</p>
+
+          <h3>Key Risks Flagged</h3>
+          <ul>
+            <li>Increased competition in cloud and AI services.</li>
+            <li>Regulatory scrutiny over data privacy and antitrust concerns.</li>
+            <li>Potential macroeconomic headwinds affecting enterprise spending.</li>
+          </ul>
+
+          <h3>Analyst Watch Items</h3>
+          <ul>
+            <li>Monitor developments and performance of AI-driven product lines.</li>
+            <li>Observe impacts of regulatory actions on business operations and M&amp;A activities.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Management Quote Bank</h3>
+        <div class="quote-list">
+          <div class="quote-card">
+            <div class="quote-text">"Our Azure and other cloud services revenue grew 33 percent, driven by AI demand."</div>
+            <div class="quote-meta">
+              <strong>Satya Nadella, CEO</strong><br/>
+              Q1 FY2026 earnings call — Azure growth
+            </div>
+            <div class="quote-relevance">AI Demand Signal</div>
+          </div>
+          <div class="quote-card">
+            <div class="quote-text">"We are doubling down on AI and cloud infrastructure investment to sustain our competitive edge."</div>
+            <div class="quote-meta">
+              <strong>Amy Hood, CFO</strong><br/>
+              Q1 FY2026 earnings call — CapEx ambitions
+            </div>
+            <div class="quote-relevance">CapEx Strategy</div>
+          </div>
+        </div>
+
+        <br/>
+        <h3>Next Quarter Guidance</h3>
+        <div style="background:var(--surface2);border-radius:8px;padding:14px 16px;font-size:14px;">
+          <div style="margin-bottom:8px;">
+            <span style="color:var(--muted);font-size:12px;">Revenue Guidance</span><br/>
+            <strong style="font-size:18px;">$68.1 – 68.9B</strong>
+          </div>
+          <div style="color:var(--muted);font-size:13px;font-style:italic;">
+            "Focused on expanding data center capabilities to support Azure growth."
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── GOOG tab ── -->
+  <div id="tab-goog" class="tab-panel">
+    <div style="background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--accent3);
+                border-radius:8px;padding:16px 20px;margin-bottom:24px;font-size:14px;">
+      <strong style="color:var(--accent3);">Partial Extraction — Pre-Fix</strong><br/>
+      This data was produced before the Agent 2 file-saving fix. The LLM completed its analysis but
+      returned <code>end_turn</code> without calling the save tools, resulting in "Not disclosed" placeholders.
+      After the fix, Agent 2 parses XML-tagged text in the response directly, guaranteeing all three
+      output files are written regardless of whether the LLM calls save tools.
+    </div>
+
+    <div class="two-col">
+      <div class="panel">
+        <h3>Company Brief</h3>
+        <div class="brief-meta">Period: FY2025 + Q3 FY2025</div>
+        <div class="brief-body">
+          <h2>Alphabet Inc. (GOOG) — Quarter Brief</h2>
+          <p><strong>Investment Theme:</strong> AI CapEx Focus</p>
+
+          <h3>What Changed This Quarter</h3>
+          <ul>
+            <li>Continued emphasis on AI and technological infrastructure.</li>
+            <li>Notable shift in revenue dynamics across core services and cloud segments.</li>
+            <li>Management highlighted investment focus areas in key long-term segments.</li>
+          </ul>
+
+          <h3>Management Tone &amp; Commentary</h3>
+          <p>Management maintained a forward-looking and strategic approach, emphasizing growth
+             and investment in AI infrastructure, despite economic headwinds.</p>
+
+          <h3>AI / Strategic CapEx</h3>
+          <p>While detailed expenditure figures were not captured in this extraction, management
+             reiterated their commitment to expanding data center capabilities and enhancing AI
+             functionalities across platforms.</p>
+
+          <h3>Key Risks Flagged</h3>
+          <ul>
+            <li>Regulatory pressures continue to pose potential challenges.</li>
+            <li>Economic environment remains uncertain, requiring careful capital deployment.</li>
+          </ul>
+
+          <h3>Analyst Watch Items</h3>
+          <ul>
+            <li>Focus on forthcoming AI integrations and potential regulatory developments.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Management Quote Bank</h3>
+        <div class="quote-list">
+          <div class="quote-card">
+            <div class="quote-text">"Our commitment to AI continues as we enhance our infrastructure and capabilities across services."</div>
+            <div class="quote-meta">
+              <strong>Sundar Pichai, CEO</strong><br/>
+              Quarterly earnings call — AI strategy
+            </div>
+            <div class="quote-relevance">Strategic Focus</div>
+          </div>
+        </div>
+
+        <br/>
+        <h3>KPI Extraction Status</h3>
+        <div style="background:var(--surface2);border-radius:8px;padding:14px 16px;font-size:13px;color:var(--muted);">
+          KPIs for GOOG require re-extraction with the updated Agent 2. Run
+          <code>python main.py --force</code> to regenerate all data files with
+          the fixed XML-parsing save logic.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  Buy-Side Financial Analyst &mdash; Multi-Agent AI System &nbsp;|&nbsp;
+  Agents: Claude claude-opus-4-6 &nbsp;|&nbsp; Data: SEC EDGAR
+</footer>
+
+<script>
+  function showTab(id, btn) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + id).classList.add('active');
+    btn.classList.add('active');
+  }
+
+  // Smooth-scroll for nav links
+  document.querySelectorAll('nav a').forEach(link => {
+    link.addEventListener('click', e => {
+      e.preventDefault();
+      const target = document.querySelector(link.getAttribute('href'));
+      if (target) target.scrollIntoView({ behavior: 'smooth' });
+      document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+      link.classList.add('active');
+    });
+  });
+
+  // Highlight active nav item on scroll
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks = document.querySelectorAll('nav a');
+  window.addEventListener('scroll', () => {
+    let current = '';
+    sections.forEach(sec => {
+      if (window.scrollY >= sec.offsetTop - 100) current = sec.id;
+    });
+    navLinks.forEach(a => {
+      a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+    });
+  });
+</script>
+</body>
+</html>

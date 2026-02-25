@@ -19,6 +19,7 @@ def setup_observability():
     """
     try:
         from opentelemetry import trace
+        from openinference.semconv.resource import ResourceAttributes
         from opentelemetry.sdk.resources import Resource
         from opentelemetry.sdk.trace import TracerProvider
         from opentelemetry.sdk.trace.export import BatchSpanProcessor
@@ -26,7 +27,8 @@ def setup_observability():
 
         # Tag every span with the Phoenix project name so traces appear under
         # the correct project rather than the Phoenix default project.
-        resource = Resource({"phoenix.project.name": PHOENIX_PROJECT})
+        # resource = Resource({"phoenix.project.name": PHOENIX_PROJECT})
+        resource = Resource(attributes={ResourceAttributes.PROJECT_NAME: PHOENIX_PROJECT})
         provider = TracerProvider(resource=resource)
         exporter = OTLPSpanExporter(endpoint=PHOENIX_ENDPOINT)
         provider.add_span_processor(BatchSpanProcessor(exporter))

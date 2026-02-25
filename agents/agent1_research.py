@@ -2,6 +2,8 @@
 
 import sys
 
+import os
+
 from config import MAX_AGENT_TURNS, FINANCIAL_FILES_DIR
 from llm import create_adapter
 from tools import AGENT1_TOOL_DEFINITIONS, AGENT1_FUNCTIONS, execute_tool
@@ -13,18 +15,22 @@ class ResearchAgent:
 
     Args:
         companies: List of dicts with 'name' and 'ticker' keys.
+        project: Project name (used as parent subfolder under Financial Files).
     """
 
-    def __init__(self, companies: list[dict]):
+    def __init__(self, companies: list[dict], project: str):
         self.companies = companies
+        self.project = project
         self.adapter = create_adapter(thinking=False)
 
     def run(self) -> str:
         """Execute the research agent loop and return the final summary."""
         print("\n[Agent 1 — Research] Starting SEC EDGAR filing collection...", file=sys.stderr)
         print(f"  Companies: {[c['ticker'] for c in self.companies]}", file=sys.stderr)
+        print(f"  Project: {self.project}", file=sys.stderr)
 
-        user_message = build_agent1_message(self.companies, FINANCIAL_FILES_DIR)
+        financial_files_dir = os.path.join(FINANCIAL_FILES_DIR, self.project)
+        user_message = build_agent1_message(self.companies, financial_files_dir, self.project)
         messages = [{"role": "user", "content": user_message}]
 
         for turn in range(MAX_AGENT_TURNS):

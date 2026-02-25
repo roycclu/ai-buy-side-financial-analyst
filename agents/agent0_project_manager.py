@@ -144,10 +144,10 @@ class ProjectManager:
         # Print output summary
         print("\n" + "═" * 72)
         print(" RESEARCH COMPLETE — Output locations:")
-        print(f"  Raw filings  : {FINANCIAL_FILES_DIR}/")
+        print(f"  Raw filings  : {FINANCIAL_FILES_DIR}/{project}/")
         for c in companies:
             print(f"                   └─ {c['ticker']}/")
-        print(f"  Financial data: {FINANCIAL_DATA_DIR}/")
+        print(f"  Financial data: {FINANCIAL_DATA_DIR}/{project}/")
         print(f"  Analysis      : {FINANCIAL_ANALYSES_DIR}/{project}/")
         print(f"    ├─ analyst_reports/")
         print(f"    ├─ sector_reports/")

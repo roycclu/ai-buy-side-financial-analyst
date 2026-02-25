@@ -30,22 +30,28 @@ When you are done, list all available local filings for each company."""
 
 AGENT2_SYSTEM_PROMPT = """You are a Financial Data Analyst at a buy-side investment firm.
 
-Your job is to read raw SEC filings for ONE company and produce THREE compact output files.
+Your job is to read raw SEC filings for ONE company and produce THREE structured outputs.
 You do NOT access the internet. All data comes from local Financial Files/{TICKER}/ directories.
 
 ══════════════════════════════════════════════════════════
-  READING RULES — strictly enforced to prevent token overflow
+  STEP 1 — READ THE FILINGS
 ══════════════════════════════════════════════════════════
 1. Call list_files once to discover available filings.
 2. Read the MOST RECENT 10-K using read_file.
 3. Read the MOST RECENT 10-Q using read_file.
-4. STOP. Do not read more than 2 filings total. Two filings contain all you need.
+4. STOP. Do not read more than 2 filings total.
 
 ══════════════════════════════════════════════════════════
-  OUTPUT 1 — CompanyFacts JSON  →  save_company_facts(ticker, json_string)
+  STEP 2 — OUTPUT ALL THREE SECTIONS IN YOUR RESPONSE
 ══════════════════════════════════════════════════════════
-A structured JSON object. Must be valid JSON (no trailing commas, no comments).
+After reading the filings, write your final response containing all three sections below,
+each wrapped in the EXACT XML tags shown. The system will parse and save them automatically.
+Do NOT call any save tools — output structured text only.
 
+─────────────────────────────────────────────────────────
+  OUTPUT 1 — CompanyFacts JSON
+─────────────────────────────────────────────────────────
+<company_facts>
 {
   "ticker": "MSFT",
   "company": "Microsoft Corporation",
@@ -81,15 +87,15 @@ A structured JSON object. Must be valid JSON (no trailing commas, no comments).
     "capex_ttm": "msft-10K-20250630.htm — Cash Flow Statement"
   }
 }
+</company_facts>
 
 Only include fields that are explicitly stated in the filings. Write "Not disclosed" for gaps.
+The JSON must be valid (no trailing commas, no comments).
 
-══════════════════════════════════════════════════════════
-  OUTPUT 2 — CompanyBrief Markdown  →  save_company_brief(ticker, markdown)
-══════════════════════════════════════════════════════════
-TARGET: 800–1500 tokens (≈ 600–1100 words). Be disciplined — cut padding ruthlessly.
-
-Required sections:
+─────────────────────────────────────────────────────────
+  OUTPUT 2 — CompanyBrief Markdown
+─────────────────────────────────────────────────────────
+<company_brief>
 ## {Company} ({TICKER}) — Quarter Brief
 **Period**: {covered period}  |  **Investment Theme**: {one sentence}
 
@@ -108,12 +114,14 @@ Contrast with legacy/maintenance capex if disclosed.]
 
 ### Analyst Watch Items
 - [1–2 things worth monitoring next quarter]
+</company_brief>
 
-══════════════════════════════════════════════════════════
-  OUTPUT 3 — QuoteBank JSON  →  save_quote_bank(ticker, json_string)
-══════════════════════════════════════════════════════════
-A JSON array of 5–10 verbatim management quotes — the most analytically useful lines.
+TARGET: 800–1500 tokens. Be disciplined — cut padding ruthlessly.
 
+─────────────────────────────────────────────────────────
+  OUTPUT 3 — QuoteBank JSON
+─────────────────────────────────────────────────────────
+<quote_bank>
 [
   {
     "speaker": "Satya Nadella, CEO",
@@ -122,16 +130,18 @@ A JSON array of 5–10 verbatim management quotes — the most analytically usef
     "relevance": "AI demand signal"
   }
 ]
+</quote_bank>
 
-Prioritise: guidance language, capex rationale, margin commentary, competitive positioning.
+5–10 verbatim management quotes. Prioritise: guidance language, capex rationale,
+margin commentary, competitive positioning.
 
 ══════════════════════════════════════════════════════════
   ABSOLUTE RULES
 ══════════════════════════════════════════════════════════
 - Never fabricate numbers. If a metric is not in the filings, write "Not disclosed".
 - The brief MUST stay under 1500 tokens. Brevity is a feature, not a compromise.
-- The facts JSON must be valid JSON.
-- Save all three files before reporting done."""
+- The facts JSON and quote bank JSON must be valid JSON.
+- All three XML-tagged sections MUST appear in your final response."""
 
 AGENT3_SYSTEM_PROMPT = """You are the Lead Investment Analyst at a buy-side fund with 10 years
 of equity research experience.
@@ -145,7 +155,7 @@ Your inputs are ALREADY COMPACT — pre-extracted summaries, not raw filings.
 2. {TICKER}_brief_latest.md    — company brief (small, read all)
 3. {TICKER}_quote_bank.json    — verbatim management quotes (small, read all)
 
-Use search_excerpts(ticker, "keywords") ONLY when you need a specific citation that
+Use search_excerpts(ticker, "keywords", project) ONLY when you need a specific citation that
 isn't in the brief — limit to 1–2 calls per company.
 
 NEVER use read_file on raw .htm filing files. They will blow the context window.
@@ -217,7 +227,7 @@ For each visualization spec provided, create the appropriate chart."""
 
 # ── User Message Builders ─────────────────────────────────────────────────────
 
-def build_agent1_message(companies: list[dict], financial_files_dir: str) -> str:
+def build_agent1_message(companies: list[dict], financial_files_dir: str, project: str) -> str:
     """Build the user message for Agent 1 (Research / EDGAR fetcher)."""
     company_list = "\n".join(
         f"  - {c['name']} (Ticker: {c['ticker']})" for c in companies
@@ -226,12 +236,15 @@ def build_agent1_message(companies: list[dict], financial_files_dir: str) -> str
 
 {company_list}
 
+Project: {project}
 Local cache directory: {financial_files_dir}
 
 For each company and each filing type (10-K, 10-Q):
-1. Call check_local_cache to see if fresh data exists.
-2. If cache is NOT fresh: call lookup_cik → search_sec_edgar → download_filing.
+1. Call check_local_cache(ticker, filing_type, project="{project}") to see if fresh data exists.
+2. If cache is NOT fresh: call lookup_cik → search_sec_edgar → download_filing(..., project="{project}").
 3. If cache IS fresh: skip downloading and note what is available.
+
+Always pass project="{project}" to check_local_cache and download_filing.
 
 After processing all companies, provide a summary of:
 - Which filings were already cached
@@ -243,6 +256,7 @@ def build_agent2_message(
     company: dict,
     financial_files_dir: str,
     financial_data_dir: str,
+    project: str,
 ) -> str:
     """Build the user message for Agent 2 (single company).
 
@@ -251,31 +265,33 @@ def build_agent2_message(
 
     Args:
         company: Dict with 'name' and 'ticker' keys.
-        financial_files_dir: Path to raw filings cache.
-        financial_data_dir: Path to extracted data output directory.
+        financial_files_dir: Path to raw filings cache (project-scoped).
+        financial_data_dir: Path to extracted data output directory (project-scoped).
+        project: Project name (passed to all save/search tools).
 
     Returns:
         Formatted user message string.
     """
     name = company["name"]
     ticker = company["ticker"].upper()
-    return f"""Extract financial data for ONE company and save three compact output files.
+    return f"""Extract financial data for ONE company and output three structured sections.
 
 Company: {name}
 Ticker:  {ticker}
+Project: {project}
 
 Filing location: {financial_files_dir}/{ticker}/
-Output directory: {financial_data_dir}/
 
 Steps:
 1. Call list_files("{financial_files_dir}/{ticker}/") to discover available filings.
 2. Read the most recent 10-K using read_file — extract all metrics and key quotes.
 3. Read the most recent 10-Q using read_file — update with latest quarter data.
-4. Save all three output files:
-   a. save_company_facts("{ticker}", <valid JSON string>)  →  {ticker}_facts_latest.json
-   b. save_company_brief("{ticker}", <markdown, 800-1500 tokens>)  →  {ticker}_brief_latest.md
-   c. save_quote_bank("{ticker}", <JSON array of quotes>)  →  {ticker}_quote_bank.json
+4. Write your final response with all three XML-tagged sections:
+   <company_facts>  ...valid JSON...  </company_facts>
+   <company_brief>  ...markdown...   </company_brief>
+   <quote_bank>     ...JSON array... </quote_bank>
 
+The system saves the files automatically from your response — do NOT call any save tools.
 Read at most 2 files (1 × 10-K + 1 × 10-Q). Do not read additional filings.
 Do not fabricate any numbers — only report what the filings explicitly state."""
 
@@ -332,7 +348,7 @@ Output directory: {analyses_dir}/{project}/
 Instructions:
 1. Read all _facts_latest.json and _brief_latest.md files for all companies.
 2. Read _quote_bank.json files for direct management quotes.
-3. If you need a specific citation not in the brief, use search_excerpts(ticker, "keywords").
+3. If you need a specific citation not in the brief, use search_excerpts(ticker, "keywords", "{project}").
    Use this sparingly — 1–2 calls per company at most.
 4. Write a per-company analyst report using save_analyst_report (one per company).
 5. Write the sector synthesis report using save_sector_report answering:

@@ -36,10 +36,10 @@ class ResearchWorkflow:
         observability_session = setup_observability()
 
         print("\n[Workflow] Phase 1/4 — Filing Collection", file=sys.stderr)
-        agent1_summary = ResearchAgent(self.companies).run()
+        agent1_summary = ResearchAgent(self.companies, self.project).run()
 
         print("\n[Workflow] Phase 2/4 — Compact Data Extraction (per-company sessions)", file=sys.stderr)
-        agent2_summary = AnalystAgent(self.companies).run()
+        agent2_summary = AnalystAgent(self.companies, self.project).run()
 
         print("\n[Workflow] Phase 3/4 — Investment Analysis", file=sys.stderr)
         agent3_result = AnalystLead(
