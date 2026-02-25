@@ -34,6 +34,17 @@ from utils.prompts import AGENT2_SYSTEM_PROMPT, build_agent2_message
 # Per-company session trim threshold (much lower than before — one company at a time)
 _MAX_HISTORY_CHARS = 150_000  # ~37k tokens; safety net if filings are very large
 
+# How many times to re-prompt the model when it produces output without the required XML tags
+# or skips the tool-call reading step entirely.
+_MAX_FORMAT_RETRIES = 2
+
+# Maps internal section key → XML tag name used in the prompt / parser
+_SECTION_TAGS = {
+    "facts":  "company_facts",
+    "brief":  "company_brief",
+    "quotes": "quote_bank",
+}
+
 
 def _estimate_chars(messages: list) -> int:
     """Rough character count across all message content."""
@@ -170,12 +181,55 @@ def _parse_and_save_outputs(text: str, ticker: str, project: str) -> dict[str, b
     return saved
 
 
+def _build_retry_message(missing: list[str], tools_were_called: bool) -> str:
+    """Build a corrective follow-up message when the model produced bad output.
+
+    Two cases:
+    - tools_were_called=False: model skipped the file-reading steps entirely.
+    - tools_were_called=True:  model read files but didn't use the XML output format.
+    """
+    if not tools_were_called:
+        return (
+            "You did not call any tools. You MUST follow the mandatory sequence:\n"
+            "1. Call list_files on the filing directory.\n"
+            "2. Call read_file on the most recent 10-K.\n"
+            "3. Call read_file on the most recent 10-Q.\n"
+            "Only after those tool calls, write your response using the three XML tags: "
+            "<company_facts>...</company_facts>, <company_brief>...</company_brief>, "
+            "<quote_bank>...</quote_bank>. Do not output anything before completing the tool calls."
+        )
+    missing_tags = ", ".join(
+        f"<{_SECTION_TAGS[k]}>...</{_SECTION_TAGS[k]}>" for k in missing
+    )
+    return (
+        f"Your response was missing required XML output sections: {missing_tags}.\n"
+        "Please re-emit your complete analysis right now using ONLY these three XML tags "
+        "and no other text:\n\n"
+        "<company_facts>\n"
+        "{ valid JSON object with all KPI fields }\n"
+        "</company_facts>\n\n"
+        "<company_brief>\n"
+        "## CompanyName (TICKER) — Quarter Brief\n"
+        "... markdown content ...\n"
+        "</company_brief>\n\n"
+        "<quote_bank>\n"
+        '[{"speaker": "...", "context": "...", "quote": "...", "relevance": "..."}]\n'
+        "</quote_bank>\n\n"
+        "Do NOT use asterisks, curly-brace pseudocode, or any notation other than these "
+        "exact XML tags. Base all numbers on the filing content you already read."
+    )
+
+
 def _run_for_company(company: dict, project: str) -> str:
     """Run a fresh, isolated LLM session to process a single company.
 
     The LLM reads filings via tool calls (list_files / read_file), then outputs
     three XML-tagged sections in its final text.  _parse_and_save_outputs()
     extracts those sections and writes the files — no save tools required.
+
+    If the model skips the tool-call reading step or produces output without the
+    required XML tags, a corrective follow-up message is appended and the loop
+    continues.  This retries up to _MAX_FORMAT_RETRIES times.
 
     Produces three compact files:
       {TICKER}_facts_latest.json  — structured KPI table with citations
@@ -200,6 +254,9 @@ def _run_for_company(company: dict, project: str) -> str:
     messages = [{"role": "user", "content": user_message}]
 
     final_text = ""
+    tools_called_this_session = False
+    format_retries = 0
+
     for turn in range(MAX_AGENT_TURNS):
         messages = _trim_tool_results(messages)
         response = adapter.chat(messages, AGENT2_SYSTEM_PROMPT, AGENT2_TOOL_DEFINITIONS)
@@ -207,6 +264,7 @@ def _run_for_company(company: dict, project: str) -> str:
         print(f"    [Turn {turn + 1}] {response.stop_reason}", file=sys.stderr)
 
         if response.stop_reason == "tool_use":
+            tools_called_this_session = True
             results = []
             for tc in response.tool_calls:
                 print(f"    Tool: {tc.name}", file=sys.stderr)
@@ -216,24 +274,42 @@ def _run_for_company(company: dict, project: str) -> str:
 
         elif response.stop_reason == "end_turn":
             final_text = response.text
-            break
+
+            # Try to parse the three XML sections and save files
+            saved = _parse_and_save_outputs(final_text, ticker, project)
+            missing = [k for k, v in saved.items() if not v]
+
+            if not missing:
+                # All three sections found and saved — done
+                print(f"    All 3 output files saved for {ticker}.", file=sys.stderr)
+                return final_text
+
+            # Something is missing — decide whether to retry
+            if format_retries >= _MAX_FORMAT_RETRIES:
+                print(
+                    f"    WARNING: {ticker} — gave up after {format_retries} format "
+                    f"retries; still missing: {missing}",
+                    file=sys.stderr,
+                )
+                return final_text
+
+            format_retries += 1
+            print(
+                f"    [Format retry {format_retries}/{_MAX_FORMAT_RETRIES}] "
+                f"tools_called={tools_called_this_session}, missing={missing}",
+                file=sys.stderr,
+            )
+            corrective = _build_retry_message(missing, tools_called_this_session)
+            messages.append(adapter.make_assistant_message(response))
+            messages.append({"role": "user", "content": corrective})
+            # Do NOT break — continue the loop with the corrective message appended
 
         else:
             print(f"    Unexpected stop reason: {response.stop_reason}", file=sys.stderr)
             final_text = response.text
-            break
-    else:
-        print(f"    Warning: reached max turns ({MAX_AGENT_TURNS}) for {ticker}", file=sys.stderr)
-        final_text = response.text if response else ""
+            return final_text
 
-    # Parse structured output and save files — no LLM tool calls needed
-    saved = _parse_and_save_outputs(final_text, ticker, project)
-    missing = [k for k, v in saved.items() if not v]
-    if missing:
-        print(f"    WARNING: {ticker} — sections not saved: {missing}", file=sys.stderr)
-    else:
-        print(f"    All 3 output files saved for {ticker}.", file=sys.stderr)
-
+    print(f"    Warning: reached max turns ({MAX_AGENT_TURNS}) for {ticker}", file=sys.stderr)
     return final_text
 
 

@@ -27,6 +27,45 @@ from tools.file_tools import save_sector_report as _save_sector_report
 from utils.prompts import AGENT3_SYSTEM_PROMPT, build_agent3_message
 
 
+def _analyst_report_path(project: str, company_name: str) -> str:
+    """Return the expected filesystem path for a company's analyst report."""
+    company_safe = company_name.lower().replace(" ", "_")
+    return os.path.join(
+        FINANCIAL_ANALYSES_DIR, project, "analyst_reports",
+        f"{company_safe}_analyst_report.md",
+    )
+
+
+def _sector_report_path(project: str) -> str:
+    """Return the expected filesystem path for the sector report."""
+    return os.path.join(FINANCIAL_ANALYSES_DIR, project, "sector_reports", "sector_report.md")
+
+
+def _viz_specs_path(project: str) -> str:
+    """Return the path used to persist viz_specs between runs."""
+    return os.path.join(FINANCIAL_ANALYSES_DIR, project, "viz_specs.json")
+
+
+def _save_viz_specs(project: str, viz_specs: list[dict]) -> None:
+    """Persist viz_specs to a JSON file so the next run can skip Phase B."""
+    path = _viz_specs_path(project)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(viz_specs, fh, indent=2)
+
+
+def _load_viz_specs(project: str) -> list[dict]:
+    """Load persisted viz_specs; return [] if the file doesn't exist or is unreadable."""
+    path = _viz_specs_path(project)
+    if not os.path.isfile(path):
+        return []
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return json.load(fh)
+    except Exception:
+        return []
+
+
 def _parse_viz_specs(text: str) -> list[dict]:
     """Extract the JSON viz_specs block from Agent 3's output."""
     try:
@@ -172,12 +211,41 @@ class AnalystLead:
         print("\n  [Phase A] Per-company analyst reports...", file=sys.stderr)
         for company in self.companies:
             ticker = company["ticker"].upper()
+            name = company["name"]
+            report_path = _analyst_report_path(self.project, name)
+            if os.path.isfile(report_path):
+                print(
+                    f"  [Agent 3] {ticker}: analyst report already exists — skipping.",
+                    file=sys.stderr,
+                )
+                continue
             print(f"\n  ── {ticker} ──────────────────────────", file=sys.stderr)
             _run_company_report(self.project, company, financial_data_dir)
             print(f"  [Agent 3] {ticker} analyst report complete.", file=sys.stderr)
 
         # ── Phase B: sector synthesis report ─────────────────────────────────
         print("\n  [Phase B] Sector synthesis report...", file=sys.stderr)
+
+        # If the sector report already exists, skip the LLM call and reload viz_specs.
+        sector_path = _sector_report_path(self.project)
+        if os.path.isfile(sector_path):
+            print(
+                "  [Agent 3] Sector report already exists — skipping LLM call.",
+                file=sys.stderr,
+            )
+            with open(sector_path, encoding="utf-8") as fh:
+                cached_sector = fh.read()
+            viz_specs = _load_viz_specs(self.project)
+            if not viz_specs:
+                # Fall back to parsing the text if the JSON file is missing
+                viz_specs = _parse_viz_specs(cached_sector)
+            print(
+                f"[Agent 3] Loaded from cache. ({len(cached_sector)} chars, "
+                f"{len(viz_specs)} viz specs)",
+                file=sys.stderr,
+            )
+            return {"sector_report": cached_sector, "viz_specs": viz_specs}
+
         user_message = build_agent3_message(
             self.project,
             self.companies,
@@ -226,6 +294,10 @@ class AnalystLead:
                     else:
                         print(f"  WARNING: Failed to save sector report: {result.get('error')}", file=sys.stderr)
 
+                # Persist viz_specs so the next run can skip Phase B entirely.
+                if viz_specs:
+                    _save_viz_specs(self.project, viz_specs)
+
                 print(
                     f"[Agent 3] Done. ({len(response.text)} chars, {len(viz_specs)} viz specs)",
                     file=sys.stderr,
@@ -240,4 +312,7 @@ class AnalystLead:
         final_text = last_response.text if last_response else ""
         if not saved_sector_report and final_text.strip():
             _save_sector_report(self.project, final_text)
-        return {"sector_report": final_text, "viz_specs": _parse_viz_specs(final_text)}
+        viz_specs = _parse_viz_specs(final_text)
+        if viz_specs:
+            _save_viz_specs(self.project, viz_specs)
+        return {"sector_report": final_text, "viz_specs": viz_specs}

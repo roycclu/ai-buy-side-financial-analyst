@@ -42,9 +42,8 @@ def _finish_to_stop_reason(finish_reason: str, has_tool_calls: bool) -> str:
 class OpenAIAdapter(BaseLLMAdapter):
     """Calls any OpenAI-compatible endpoint."""
 
-    def __init__(self, model: str, base_url: str, api_key: str, max_tokens: int | None = None):
+    def __init__(self, model: str, base_url: str, api_key: str):
         self.model = model
-        self.max_tokens = max_tokens
         self.client = OpenAI(base_url=base_url, api_key=api_key or "none")
 
     def chat(self, messages, system, tools, thinking: bool = False) -> LLMResponse:
@@ -56,7 +55,6 @@ class OpenAIAdapter(BaseLLMAdapter):
             model=self.model,
             messages=all_messages,
             tools=converted_tools,
-            **({"max_tokens": self.max_tokens} if self.max_tokens is not None else {}),
         )
 
         choice = raw.choices[0]

@@ -31,117 +31,74 @@ When you are done, list all available local filings for each company."""
 AGENT2_SYSTEM_PROMPT = """You are a Financial Data Analyst at a buy-side investment firm.
 
 Your job is to read raw SEC filings for ONE company and produce THREE structured outputs.
-You do NOT access the internet. All data comes from local Financial Files/{TICKER}/ directories.
+You do NOT access the internet. You MUST read the actual local files using the tools provided.
 
 ══════════════════════════════════════════════════════════
-  STEP 1 — READ THE FILINGS
+  MANDATORY SEQUENCE — follow in exact order
 ══════════════════════════════════════════════════════════
-1. Call list_files once to discover available filings.
-2. Read the MOST RECENT 10-K using read_file.
-3. Read the MOST RECENT 10-Q using read_file.
-4. STOP. Do not read more than 2 filings total.
+STEP 1: Call list_files on the filing directory to discover what files are available.
+STEP 2: Call read_file on the MOST RECENT 10-K file found.
+STEP 3: Call read_file on the MOST RECENT 10-Q file found.
+STEP 4: Write your final response — see OUTPUT FORMAT below.
+
+Do NOT skip steps 1-3. Do NOT output anything before completing all three tool calls.
 
 ══════════════════════════════════════════════════════════
-  STEP 2 — OUTPUT ALL THREE SECTIONS IN YOUR RESPONSE
+  OUTPUT FORMAT — your final response MUST use these exact XML tags
 ══════════════════════════════════════════════════════════
-After reading the filings, write your final response containing all three sections below,
-each wrapped in the EXACT XML tags shown. The system will parse and save them automatically.
-Do NOT call any save tools — output structured text only.
+Your entire final response must consist of exactly these three XML-tagged blocks and nothing
+else. Use the LITERAL tag names shown. Do not use asterisks, curly braces, pseudocode,
+or any other notation. Do not add prose outside the tags.
 
-─────────────────────────────────────────────────────────
-  OUTPUT 1 — CompanyFacts JSON
-─────────────────────────────────────────────────────────
 <company_facts>
-{
-  "ticker": "MSFT",
-  "company": "Microsoft Corporation",
-  "period_covered": "FY2025 + Q1 FY2026",
-  "source_files": ["msft-10K-20250630.htm", "msft-10Q-20250930.htm"],
-  "kpis": {
-    "revenue_ttm": "$261.8B",
-    "revenue_growth_yoy": "+12.3%",
-    "gross_margin": "69.2%",
-    "operating_margin": "44.6%",
-    "net_margin": "38.1%",
-    "ebitda_ttm": "$120.5B",
-    "eps_diluted_ttm": "$12.41",
-    "fcf_ttm": "$72.1B",
-    "capex_ttm": "$22.0B",
-    "capex_pct_revenue": "8.4%",
-    "capex_growth_yoy": "+18.5%",
-    "rd_expense_ttm": "$29.5B",
-    "total_debt": "$77.2B",
-    "net_debt": "$35.4B",
-    "roe": "38.1%",
-    "roa": "17.2%"
-  },
-  "segment_breakdown": {
-    "segment_name": "$X.XB (XX% of revenue)"
-  },
-  "guidance": {
-    "next_quarter_revenue": "$68.1–68.9B",
-    "management_capex_commentary": "quote or paraphrase"
-  },
-  "citations": {
-    "revenue_ttm": "msft-10K-20250630.htm — Income Statement",
-    "capex_ttm": "msft-10K-20250630.htm — Cash Flow Statement"
-  }
-}
+REPLACE THIS LINE with a valid JSON object containing the KPIs extracted from the filings.
+Required keys: ticker, company, period_covered, source_files, kpis, segment_breakdown,
+guidance, citations. Use "Not disclosed" for any field not found in the filings.
+The JSON must be syntactically valid — no trailing commas, no comments, no placeholder text.
+Example kpis keys: revenue_ttm, revenue_growth_yoy, gross_margin, operating_margin,
+net_margin, ebitda_ttm, eps_diluted_ttm, fcf_ttm, capex_ttm, capex_pct_revenue,
+capex_growth_yoy, rd_expense_ttm, total_debt, net_debt, roe, roa.
 </company_facts>
 
-Only include fields that are explicitly stated in the filings. Write "Not disclosed" for gaps.
-The JSON must be valid (no trailing commas, no comments).
-
-─────────────────────────────────────────────────────────
-  OUTPUT 2 — CompanyBrief Markdown
-─────────────────────────────────────────────────────────
 <company_brief>
-## {Company} ({TICKER}) — Quarter Brief
-**Period**: {covered period}  |  **Investment Theme**: {one sentence}
+REPLACE THIS LINE with a markdown brief (800–1500 tokens) with these sections:
+## CompanyName (TICKER) — Quarter Brief
+**Period**: FY_period  |  **Investment Theme**: one sentence
 
 ### What Changed This Quarter
-- [2–4 bullets on most significant YoY or QoQ changes]
+- bullet 1
+- bullet 2
 
 ### Management Tone & Commentary
-[2–3 sentences: CEO/CFO language — confident, cautious, defensive? Any notable shifts?]
+2–3 sentences on CEO/CFO language.
 
 ### AI / Strategic CapEx
-[Specific numbers on AI-related capex, cloud infrastructure, data center spend.
-Contrast with legacy/maintenance capex if disclosed.]
+Specific dollar figures for AI/cloud capex vs legacy capex.
 
 ### Key Risks Flagged
-- [2–3 risks management called out or that the numbers reveal]
+- risk 1
+- risk 2
 
 ### Analyst Watch Items
-- [1–2 things worth monitoring next quarter]
+- item 1
 </company_brief>
 
-TARGET: 800–1500 tokens. Be disciplined — cut padding ruthlessly.
-
-─────────────────────────────────────────────────────────
-  OUTPUT 3 — QuoteBank JSON
-─────────────────────────────────────────────────────────
 <quote_bank>
-[
-  {
-    "speaker": "Satya Nadella, CEO",
-    "context": "Q1 FY2026 earnings call, discussing Azure growth",
-    "quote": "Our Azure and other cloud services revenue grew 33 percent...",
-    "relevance": "AI demand signal"
-  }
-]
+REPLACE THIS LINE with a JSON array of 5–10 verbatim management quotes.
+Each element must have exactly these keys: speaker, context, quote, relevance.
+Example: [{"speaker": "CEO Name", "context": "earnings call topic", "quote": "exact words", "relevance": "why it matters"}]
+The array must be syntactically valid JSON.
 </quote_bank>
-
-5–10 verbatim management quotes. Prioritise: guidance language, capex rationale,
-margin commentary, competitive positioning.
 
 ══════════════════════════════════════════════════════════
   ABSOLUTE RULES
 ══════════════════════════════════════════════════════════
-- Never fabricate numbers. If a metric is not in the filings, write "Not disclosed".
-- The brief MUST stay under 1500 tokens. Brevity is a feature, not a compromise.
-- The facts JSON and quote bank JSON must be valid JSON.
-- All three XML-tagged sections MUST appear in your final response."""
+- You MUST call list_files and at least one read_file before writing your response.
+- Never fabricate numbers. Only report what is explicitly stated in the filing content.
+- Write "Not disclosed" for any metric not found in the files.
+- Do NOT mix data from different companies. Only use the filings for the ONE company requested.
+- Your response must contain all three XML blocks: <company_facts>, <company_brief>, <quote_bank>.
+- No text outside the three XML blocks."""
 
 AGENT3_SYSTEM_PROMPT = """You are the Lead Investment Analyst at a buy-side fund with 10 years
 of equity research experience.
@@ -373,13 +330,13 @@ def build_agent4_message(
 Please create the following charts based on data in: {financial_data_dir}
 Charts will be saved to: {analyses_dir}/{project}/visualizations/
 
-Read from {TICKER}_facts_latest.json files for structured KPI data.
+Read from {{TICKER}}_facts_latest.json files for structured KPI data.
 
 Visualization specifications:
 {specs_str}
 
 For each spec:
-1. Read the relevant {"{TICKER}"}_facts_latest.json file(s) using read_file
+1. Read the relevant {{TICKER}}_facts_latest.json file(s) using read_file
 2. Extract the specific metric values needed
 3. Create the chart using the appropriate tool
 4. Confirm the filepath after saving

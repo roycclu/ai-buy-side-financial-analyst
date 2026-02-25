@@ -28,7 +28,6 @@ def create_adapter(thinking: bool = False, thinking_budget: int = 8000) -> BaseL
             model=config.OPENAI_MODEL,
             base_url=config.OPENAI_BASE_URL,
             api_key=config.OPENAI_API_KEY,
-            max_tokens=config.MAX_TOKENS,
         )
 
     if provider == "llama":
