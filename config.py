@@ -46,6 +46,14 @@ LLAMA_PORT     = int(os.getenv("LLAMA_PORT", "17777"))
 LLAMA_BASE_URL = os.getenv("LLAMA_BASE_URL", f"http://{os.getenv('LLAMA_HOST', '127.0.0.1')}:{os.getenv('LLAMA_PORT', '17777')}/v1")
 LLAMA_MODEL    = os.getenv("LLAMA_MODEL", "llama3.2:1b")
 
+# ── Harness selection ─────────────────────────────────────────────────────────
+# Choose which agent framework orchestrates the research pipeline.
+# "native"     → built-in 5-agent pipeline (default, no extra deps)
+# "crewai"     → CrewAI multi-agent crew (requires: pip install crewai)
+# "llamaindex" → LlamaIndex RAG-first pipeline (requires: pip install llama-index-core ...)
+# "langchain"  → LangChain stateful workflow (requires: pip install langchain langgraph ...)
+HARNESS = os.getenv("HARNESS", "native")
+
 # ── SEC EDGAR API settings ────────────────────────────────────────────────────
 SEC_EDGAR_SUBMISSIONS_URL = "https://data.sec.gov/submissions"
 SEC_EDGAR_ARCHIVES_URL    = "https://www.sec.gov/Archives/edgar/data"

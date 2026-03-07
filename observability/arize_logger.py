@@ -3,20 +3,32 @@ instruments all Anthropic and OpenAI SDK calls."""
 
 import sys
 
-PHOENIX_ENDPOINT   = "http://localhost:6006/v1/traces"
-PHOENIX_PROJECT    = "buy-side-financial-analyst"
+PHOENIX_ENDPOINT = "http://localhost:6006/v1/traces"
+
+# Maps harness name → Phoenix project name
+_HARNESS_PROJECTS = {
+    "native":     "buy-side-financial-analyst",
+    "crewai":     "buy-side-crewai-team",
+    "llamaindex": "buy-side-llamaindex-team",
+    "langchain":  "buy-side-langchain-team",
+}
 
 
-def setup_observability():
+def setup_observability(harness: str = "native"):
     """Register OTLP exporters and instrument LLM SDKs.
 
     Connects to the already-running Phoenix server at http://localhost:6006.
-    All traces are routed to the '{PHOENIX_PROJECT}' project in Phoenix.
+    Traces are routed to the Phoenix project corresponding to the active harness.
     Does NOT attempt to launch a new Phoenix process.
+
+    Args:
+        harness: Active harness name — "native", "crewai", "llamaindex", or "langchain".
 
     Returns:
         True on success, False if any required package is missing.
     """
+    project = _HARNESS_PROJECTS.get(harness, "buy-side-financial-analyst")
+
     try:
         from opentelemetry import trace
         from openinference.semconv.resource import ResourceAttributes
@@ -27,8 +39,7 @@ def setup_observability():
 
         # Tag every span with the Phoenix project name so traces appear under
         # the correct project rather than the Phoenix default project.
-        # resource = Resource({"phoenix.project.name": PHOENIX_PROJECT})
-        resource = Resource(attributes={ResourceAttributes.PROJECT_NAME: PHOENIX_PROJECT})
+        resource = Resource(attributes={ResourceAttributes.PROJECT_NAME: project})
         provider = TracerProvider(resource=resource)
         exporter = OTLPSpanExporter(endpoint=PHOENIX_ENDPOINT)
         provider.add_span_processor(BatchSpanProcessor(exporter))
@@ -40,7 +51,7 @@ def setup_observability():
         _instrument_openai(provider)
 
         print(
-            f"[Observability] Tracing → Phoenix project '{PHOENIX_PROJECT}' at http://localhost:6006",
+            f"[Observability] Tracing → Phoenix project '{project}' at http://localhost:6006",
             file=sys.stderr,
         )
         return True

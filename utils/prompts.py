@@ -1,16 +1,8 @@
-"""System prompts and user-message builders for all 5 agents."""
+"""System prompts and user-message builders for all pipeline phases."""
 
 # ── System Prompts ────────────────────────────────────────────────────────────
 
-AGENT0_SYSTEM_PROMPT = """You are the Project Manager of a buy-side financial research team.
-Your role is to guide the user through setting up a research project, collecting their
-requirements clearly, and launching the appropriate research workflow.
-
-You are professional, concise, and precise. You do NOT fabricate financial data.
-You help users articulate their research questions and ensure all required information
-is captured before initiating the research pipeline."""
-
-AGENT1_SYSTEM_PROMPT = """You are a Research Data Specialist at a buy-side investment firm.
+RESEARCH_SYSTEM_PROMPT = """You are a Research Data Specialist at a buy-side investment firm.
 
 Your ONLY job is to collect raw financial filings for a given set of companies by:
 1. Checking the local cache FIRST before making any network calls.
@@ -28,7 +20,7 @@ RULES:
 
 When you are done, list all available local filings for each company."""
 
-AGENT2_SYSTEM_PROMPT = """You are a Financial Data Analyst at a buy-side investment firm.
+EXTRACT_SYSTEM_PROMPT = """You are a Financial Data Analyst at a buy-side investment firm.
 
 Your job is to read raw SEC filings for ONE company and produce THREE structured outputs.
 You do NOT access the internet. You MUST read the actual local files using the tools provided.
@@ -100,7 +92,7 @@ The array must be syntactically valid JSON.
 - Your response must contain all three XML blocks: <company_facts>, <company_brief>, <quote_bank>.
 - No text outside the three XML blocks."""
 
-AGENT3_SYSTEM_PROMPT = """You are the Lead Investment Analyst at a buy-side fund with 10 years
+ANALYSIS_SYSTEM_PROMPT = """You are the Lead Investment Analyst at a buy-side fund with 10 years
 of equity research experience.
 
 Your inputs are ALREADY COMPACT — pre-extracted summaries, not raw filings.
@@ -165,7 +157,7 @@ Before each section, reason through:
 - How do the companies rank on the most investable metric?
 - What's the 1–2 insight that changes a portfolio decision?"""
 
-AGENT4_SYSTEM_PROMPT = """You are a Financial Data Visualization Specialist at a buy-side fund.
+VIZ_SYSTEM_PROMPT = """You are a Financial Data Visualization Specialist at a buy-side fund.
 
 Your job is to create clear, professional charts from the financial data files.
 You receive visualization specifications from the Lead Analyst and execute them.
@@ -184,8 +176,8 @@ For each visualization spec provided, create the appropriate chart."""
 
 # ── User Message Builders ─────────────────────────────────────────────────────
 
-def build_agent1_message(companies: list[dict], financial_files_dir: str, project: str) -> str:
-    """Build the user message for Agent 1 (Research / EDGAR fetcher)."""
+def build_research_message(companies: list[dict], financial_files_dir: str, project: str) -> str:
+    """Build the user message for the research phase (SEC EDGAR fetcher)."""
     company_list = "\n".join(
         f"  - {c['name']} (Ticker: {c['ticker']})" for c in companies
     )
@@ -209,15 +201,15 @@ After processing all companies, provide a summary of:
 - Total files available per company"""
 
 
-def build_agent2_message(
+def build_extract_message(
     company: dict,
     financial_files_dir: str,
     financial_data_dir: str,
     project: str,
 ) -> str:
-    """Build the user message for Agent 2 (single company).
+    """Build the user message for the extract phase (single company).
 
-    Agent 2 runs one isolated LLM session per company. This message targets
+    The extract phase runs one isolated LLM session per company. This message targets
     exactly one company so the session context stays small.
 
     Args:
@@ -253,16 +245,16 @@ Read at most 2 files (1 × 10-K + 1 × 10-Q). Do not read additional filings.
 Do not fabricate any numbers — only report what the filings explicitly state."""
 
 
-def build_agent3_message(
+def build_analysis_message(
     project: str,
     companies: list[dict],
     research_question: str,
     financial_data_dir: str,
     analyses_dir: str,
 ) -> str:
-    """Build the user message for Agent 3 (Lead Analyst).
+    """Build the user message for the analysis phase (Lead Analyst).
 
-    Agent 3 reads only compact summary files — never raw filings directly.
+    The analysis phase reads only compact summary files — never raw filings directly.
 
     Args:
         project: Project name.
@@ -310,19 +302,19 @@ Instructions:
 4. Write a per-company analyst report using save_analyst_report (one per company).
 5. Write the sector synthesis report using save_sector_report answering:
    "{research_question}"
-6. End your final response with the JSON viz_specs block for Agent 4.
+6. End your final response with the JSON viz_specs block for the visualization phase.
 
 CRITICAL: Only use read_file on the compact _facts_latest.json, _brief_latest.md, and
 _quote_bank.json files. Never call read_file on raw .htm filing files directly."""
 
 
-def build_agent4_message(
+def build_viz_message(
     project: str,
     viz_specs: list[dict],
     financial_data_dir: str,
     analyses_dir: str,
 ) -> str:
-    """Build the user message for Agent 4 (Visualization)."""
+    """Build the user message for the visualization phase."""
     import json
     specs_str = json.dumps(viz_specs, indent=2)
     return f"""Project: {project}

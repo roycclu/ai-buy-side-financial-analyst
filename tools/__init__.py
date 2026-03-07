@@ -35,9 +35,9 @@ from tools.file_tools import (
     SEARCH_EXCERPTS_TOOL,
 )
 
-# ── Per-agent tool sets ───────────────────────────────────────────────────────
+# ── Per-phase tool sets ───────────────────────────────────────────────────────
 
-AGENT1_TOOL_DEFINITIONS = [
+RESEARCH_TOOL_DEFINITIONS = [
     CHECK_CACHE_TOOL,
     LOOKUP_CIK_TOOL,
     SEARCH_EDGAR_TOOL,
@@ -45,15 +45,15 @@ AGENT1_TOOL_DEFINITIONS = [
     LIST_FILES_TOOL,
 ]
 
-# Agent 2: reads at most 2 raw filings per company, outputs 3 structured sections in
+# Extract phase: reads at most 2 raw filings per company, outputs 3 structured sections in
 # plain text.  File saving is handled by the orchestrator — NOT by LLM tool calls.
-AGENT2_TOOL_DEFINITIONS = [
+EXTRACT_TOOL_DEFINITIONS = [
     LIST_FILES_TOOL,
     READ_FILE_TOOL,
 ]
 
-# Agent 3: reads only compact summary files; uses search_excerpts for targeted citations.
-AGENT3_TOOL_DEFINITIONS = [
+# Analysis phase: reads only compact summary files; uses search_excerpts for targeted citations.
+ANALYSIS_TOOL_DEFINITIONS = [
     LIST_FILES_TOOL,
     READ_FILE_TOOL,
     SEARCH_EXCERPTS_TOOL,
@@ -62,8 +62,8 @@ AGENT3_TOOL_DEFINITIONS = [
 ]
 
 
-def get_agent4_tool_definitions() -> list:
-    """Return Agent 4 tool definitions (imports visualization_tools lazily)."""
+def get_viz_tool_definitions() -> list:
+    """Return visualization phase tool definitions (imports visualization_tools lazily)."""
     from tools.visualization_tools import (
         CREATE_BAR_CHART_TOOL,
         CREATE_LINE_CHART_TOOL,
@@ -74,7 +74,7 @@ def get_agent4_tool_definitions() -> list:
 
 # ── Function dispatch maps ────────────────────────────────────────────────────
 
-AGENT1_FUNCTIONS = {
+RESEARCH_FUNCTIONS = {
     "check_local_cache": check_local_cache,
     "lookup_cik": lookup_cik,
     "search_sec_edgar": search_sec_edgar,
@@ -82,12 +82,12 @@ AGENT1_FUNCTIONS = {
     "list_files": list_files,
 }
 
-AGENT2_FUNCTIONS = {
+EXTRACT_FUNCTIONS = {
     "list_files": list_files,
     "read_file": read_file,
 }
 
-AGENT3_FUNCTIONS = {
+ANALYSIS_FUNCTIONS = {
     "list_files": list_files,
     "read_file": read_file,
     "search_excerpts": search_excerpts,
@@ -96,8 +96,8 @@ AGENT3_FUNCTIONS = {
 }
 
 
-def get_agent4_functions() -> dict:
-    """Return Agent 4 function dispatch map (imports visualization_tools lazily)."""
+def get_viz_functions() -> dict:
+    """Return visualization phase function dispatch map (imports visualization_tools lazily)."""
     from tools.visualization_tools import (
         create_bar_chart,
         create_line_chart,
